@@ -8,7 +8,7 @@ Tagged releases are built and signed by GitHub Actions. The Android key is store
 | `ANDROID_KEYSTORE_PASSWORD` | its password (also the key password) |
 | `ANDROID_KEY_ALIAS` | `work-dashboard` |
 
-Optional variable `ANDROID_CERT_SHA256`: the certificate fingerprint. Signing is refused if the key doesn't match.
+Certificate SHA-256 fingerprint (public): `55:71:21:B2:6E:5E:FF:D7:FC:2F:93:F9:06:98:70:63:CA:59:CF:D6:6D:DC:51:41:B2:16:1A:2F:26:0C:03:6A`. The release workflow refuses to sign if the key in the secrets doesn't match it. A repository variable `ANDROID_CERT_SHA256` overrides it if the key is ever deliberately replaced.
 
 The key was created by the one-time **Generate Android release key** workflow in the private `BarksAndBytes/signing` repository. It refuses to replace an existing key and leaves a 1-day backup artifact on its run: download it, keep it offline, delete the artifact.
 

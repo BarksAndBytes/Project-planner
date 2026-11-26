@@ -81,7 +81,7 @@ jobs:
           ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          EXPECTED_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
+          EXPECTED_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 || '55:71:21:B2:6E:5E:FF:D7:FC:2F:93:F9:06:98:70:63:CA:59:CF:D6:6D:DC:51:41:B2:16:1A:2F:26:0C:03:6A' }}
         run: |
           find apk -mindepth 2 -name '*-unsigned.apk' -exec mv {} apk/ \;
           .github/scripts/sign-apk.sh apk
