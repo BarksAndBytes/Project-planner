@@ -1,0 +1,82 @@
+# Builds release installers from a version tag (e.g. v0.1.0) and attaches
+# them, unsigned, to a draft GitHub release. Signing happens afterwards on
+# Scott's own computer with his offline keys (spec 7, items 4 and 9);
+# see docs/SIGNING.md. No signing key is ever given to GitHub.
+name: Release build
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm install
+      - name: Build
+        shell: bash
+        run: .github/scripts/run-logged.sh npx tauri build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - run: npm install
+      - name: Build (unsigned release)
+        env:
+          NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
+        run: |
+          .github/scripts/run-logged.sh npx tauri android init --ci
+          .github/scripts/prepare-android.sh
+          .github/scripts/run-logged.sh npx tauri android build --apk --ci
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk
+          if-no-files-found: error
+
+  draft-release:
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+      - name: Checksums
+        run: |
+          cd out
+          find . -type f \( -name '*.msi' -o -name '*.apk' \) -exec sha256sum {} + | sed 's#\./[^/]*/##' > SHA256SUMS-unsigned.txt
+          cat SHA256SUMS-unsigned.txt
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
+            --title "Work Dashboard $GITHUB_REF_NAME" \
+            --notes "Unsigned build from tag $GITHUB_REF_NAME. Sign with your offline keys (docs/SIGNING.md), upload the signed files, then publish." \
+            $(find out -type f \( -name '*.msi' -o -name '*.apk' -o -name 'SHA256SUMS-unsigned.txt' \))

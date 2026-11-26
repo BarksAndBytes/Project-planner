@@ -20,6 +20,13 @@ tauri-build = { version = "2", features = [] }
 # Kept deliberately small (security checklist item 3). Exact versions are
 # pinned by Cargo.lock, which is committed after the first build.
 tauri = { version = "2", features = [] }
+# Data encryption at rest: XChaCha20-Poly1305 from RustCrypto.
+chacha20poly1305 = "0.10"
+serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(windows)'.dependencies]
+# Windows Data Protection API, to protect the data key.
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
 
 [profile.release]
 codegen-units = 1

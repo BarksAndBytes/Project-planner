@@ -12,9 +12,9 @@ The full design is in the application spec (kept as a Claude doc; section number
 | Tasks, work log (6 entry types, impact chips, highlights), measurements | Done |
 | Dashboard: status counts, due soon, recent wins, open blockers | Done |
 | Themes: Shop Steel, Datasheet Cobalt, Survey Magenta × light/dark/follow | Done |
-| Local storage with atomic saves | Done |
-| Encryption at rest (Android Keystore / Windows Data Protection) | Next |
-| Signed installers | Next |
+| Local storage: atomic saves, encrypted at rest (XChaCha20-Poly1305; key protected by Windows Data Protection or Android Keystore) | Done, needs a device test |
+| Android cloud backup and device transfer turned off for app data | Done |
+| Release builds from tags, signed offline ([docs/SIGNING.md](docs/SIGNING.md)) | Done; Windows installer stays unsigned for now |
 | Sync (phase 2), export (3), voice (4), polish (5), teams (6) | Later |
 
 ## Try it
@@ -51,7 +51,9 @@ src/            screens (plain JavaScript modules, no build step, no runtime dep
   js/store.js   records, tombstoned deletes, dashboard figures
   js/themes.js  palettes and contrast checks
   js/views.js   screens
-src-tauri/      native core (Rust): storage commands, app config, permissions
+src-tauri/      native core (Rust): encrypted storage, app config, permissions
+  android/      Keystore plugin and backup rules, copied into the generated Android project
+scripts/        offline APK signing
 tests/          node:test suites
 docs/           version log
 ```
