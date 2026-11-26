@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests and static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: JavaScript tests (model, store, themes contrast, static security scan)
+        run: npm test
+      - name: Rust storage tests (std only)
+        run: |
+          rustc --edition 2021 --test src-tauri/src/storage.rs -o "$RUNNER_TEMP/storage_test"
+          "$RUNNER_TEMP/storage_test"
+
+  windows:
+    name: Windows installer
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm install
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Build
+        run: npx tauri build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: work-dashboard-windows-unsigned
+          path: src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+
+  android:
+    name: Android APK (debug-signed test build)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - name: Install NDK
+        run: sdkmanager --install "ndk;27.0.12077973"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - run: npm install
+      - name: Build
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+        run: |
+          npx tauri android init --ci
+          npx tauri android build --apk --debug --ci
+      - uses: actions/upload-artifact@v4
+        with:
+          name: work-dashboard-android-debug
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error

@@ -1,1 +1,59 @@
-# Project-planner
+# Work Dashboard
+
+A personal project dashboard that installs as a native app on Android and Windows, works offline, and (from phase 2) syncs directly between your devices by QR code, with no server and no account. Built with [Tauri 2](https://tauri.app). Free and open source under the MIT license.
+
+The full design is in the application spec (kept as a Claude doc; section numbers below refer to it).
+
+## Status: phase 1 in progress
+
+| Area | State |
+| --- | --- |
+| Projects: four types with their own fields and stage tracks | Done |
+| Tasks, work log (6 entry types, impact chips, highlights), measurements | Done |
+| Dashboard: status counts, due soon, recent wins, open blockers | Done |
+| Themes: Shop Steel, Datasheet Cobalt, Survey Magenta × light/dark/follow | Done |
+| Local storage with atomic saves | Done |
+| Encryption at rest (Android Keystore / Windows Data Protection) | Next |
+| Signed installers | Next |
+| Sync (phase 2), export (3), voice (4), polish (5), teams (6) | Later |
+
+## Try it
+
+**From CI:** every push builds an unsigned Windows `.msi` and a debug-signed Android `.apk`. Download them from the run's Artifacts on the Actions tab. These are test builds; Windows will show a SmartScreen warning.
+
+**In a browser (screens only, data stays in that browser):**
+
+```sh
+npm run dev:browser   # then open http://localhost:5173
+```
+
+**Native, on your own machine:** install [Rust](https://rustup.rs), Node 20+, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/), then:
+
+```sh
+npm install
+npx tauri dev                 # Windows desktop
+npx tauri android init        # once, needs Android Studio + NDK
+npx tauri android dev         # phone over USB
+```
+
+## Tests
+
+```sh
+npm test                                                        # model, store, contrast, static security scan
+rustc --edition 2021 --test src-tauri/src/storage.rs -o /tmp/st && /tmp/st   # storage
+```
+
+## Layout
+
+```
+src/            screens (plain JavaScript modules, no build step, no runtime dependencies)
+  js/model.js   data model, limits, validation
+  js/store.js   records, tombstoned deletes, dashboard figures
+  js/themes.js  palettes and contrast checks
+  js/views.js   screens
+src-tauri/      native core (Rust): storage commands, app config, permissions
+tests/          node:test suites
+docs/           version log
+```
+
+See [SECURITY.md](SECURITY.md) for how each item of the per-update security checklist is enforced.

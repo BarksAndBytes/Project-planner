@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Work Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <nav class="sidebar" aria-label="Main">
+      <div class="brand">Work Dashboard</div>
+      <a href="#/" data-nav="dashboard">Dashboard</a>
+      <a href="#/projects" data-nav="projects">Projects</a>
+      <a href="#" id="quicklog-tab" data-nav="quicklog">Quick log</a>
+      <a href="#/settings" data-nav="settings">Settings</a>
+    </nav>
+    <div class="content">
+      <div id="status" class="status" role="status" hidden></div>
+      <main id="main"></main>
+    </div>
+  </div>
+  <dialog id="sheet" class="sheet" aria-label="Log entry"></dialog>
+</body>
+</html>

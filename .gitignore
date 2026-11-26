@@ -1,0 +1,15 @@
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+dist/
+*.log
+.DS_Store
+
+# Signing keys and secrets never go in the repository (checklist items 2 and 4).
+*.key
+*.keystore
+*.jks
+*.pfx
+*.p12
+.env
+.env.*
