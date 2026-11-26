@@ -22,7 +22,7 @@ function randomToken() {
 }
 
 export const PROBE_HELP = {
-  "timed-out": "No answer. Either this network stops devices from reaching each other (called client isolation, common on company Wi-Fi), or Windows Firewall blocked the app. On the computer: make sure you allowed Work Dashboard when Windows asked, and that the Wi-Fi is set to a Private network. If it still fails, this network needs the hotspot option (coming in a later step).",
+  "timed-out": "No answer. Either this network stops devices from reaching each other (called client isolation, common on company Wi-Fi), or Windows Firewall blocked the app. On the computer: make sure you allowed Work Dashboard when Windows asked, and that the Wi-Fi is set to a Private network. If it still fails, use the computer's hotspot for syncing on this network.",
   refused: "The computer isn't listening any more. Start the check again on the computer and scan the new code.",
   "wrong-code": "Reached a device, but the code didn't match. Scan the code that's on the computer's screen now.",
   "not-local": "That address isn't on a local network, so the app won't connect to it.",
@@ -95,6 +95,7 @@ export function netcheckView({ isAndroid }) {
       const code = String(err);
       fill(clientBox,
         h("p", { class: "errors" }, PROBE_HELP[code] ?? `Couldn't connect: ${code}`),
+        code === "timed-out" ? h("p", { class: "small" }, "Workaround: turn on the computer's Mobile hotspot, join it from the phone, and run the check again. Settings → Sync and devices explains the steps.") : null,
         clientControls());
     }
   }

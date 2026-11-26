@@ -398,6 +398,27 @@ async fn reveal_export<R: Runtime>(app: AppHandle<R>, path: String) -> Result<()
     }
 }
 
+/// Windows: opens Settings → Mobile hotspot, for syncing when the phone
+/// can't reach the computer over the normal Wi-Fi (spec 6.3).
+#[tauri::command]
+async fn open_hotspot_settings() -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        std::process::Command::new("explorer")
+            .arg("ms-settings:network-mobilehotspot")
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        Err("not supported on this device".into())
+    }
+}
+
 // ---- Voice input (phase 4) -----------------------------------------------------
 
 /// Android: opens the built-in speech recognizer and returns the text.
@@ -472,7 +493,8 @@ pub fn run() {
             pipe_close,
             save_export,
             reveal_export,
-            voice_listen
+            voice_listen,
+            open_hotspot_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running Work Dashboard");

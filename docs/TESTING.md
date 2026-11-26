@@ -29,6 +29,7 @@ Tick items off (or tell Claude what happened) as you go. Report anything odd wit
 - [ ] Remove the phone on the computer, sync: refused with "isn't in your sync group"; add it back with Add a phone
 - [ ] Second computer (if you have one): it shows "Join an existing group", a member phone scans it, it receives everything
 - [ ] Close the app and reopen on both: still in the group and still syncing (identity keys survive restarts)
+- [ ] Hotspot fallback: when sync times out, "Sync over this computer's hotspot instead" → Open hotspot settings opens Windows Mobile hotspot; phone joins it; Sync now + scan works
 
 ### Work summary export (Projects → Work summary, or a project's Summary button)
 - [ ] Preview looks right for "This quarter" with a few real entries; wording changes read well, and "undo wording" restores your words

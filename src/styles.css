@@ -214,3 +214,5 @@ body.locked .sidebar { display: none; }
 .kiosk-bar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; padding: .5rem .75rem; margin-bottom: .75rem; border-radius: var(--radius); background: var(--sunk); border-left: 4px solid var(--block); font-weight: 600; }
 .kiosk-bar.unlocked { border-left-color: var(--ok); }
 body.kiosk { --tap: 56px; font-size: 18px; }
+
+.small-btn { min-height: 36px; margin-left: .5rem; padding: 0 .7rem; font-size: .85rem; }

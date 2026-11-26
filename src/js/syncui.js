@@ -188,7 +188,18 @@ export function syncView(store, { deviceId, isAndroid, confirm, hold = (fn) => f
     if (!lastMessage) return null;
     return lastMessage.ok
       ? h("p", { class: "big ok", role: "status" }, lastMessage.text)
-      : h("p", { class: "errors", role: "alert" }, lastMessage.text);
+      : h("div", {}, h("p", { class: "errors", role: "alert" }, lastMessage.text), hotspotHelp());
+  }
+
+  // When the Wi-Fi blocks devices from reaching each other (spec 6.3).
+  function hotspotHelp() {
+    return h("details", { class: "manual" }, h("summary", {}, "Sync over this computer's hotspot instead"),
+      h("ol", { class: "steps" },
+        h("li", {}, "On the computer, turn on Mobile hotspot.", !isAndroid ? h("button", { class: "btn small-btn", onclick: () => t.invoke("open_hotspot_settings").catch(() => {}) }, "Open hotspot settings") : null),
+        h("li", {}, "On the phone, join the computer's hotspot in Wi-Fi settings (name and password are shown in the hotspot settings)."),
+        h("li", {}, "Tap Sync now on the computer and scan again. The code includes the hotspot address."),
+        h("li", {}, "Afterwards, switch the phone back to its normal Wi-Fi.")),
+      h("p", { class: "small muted" }, "Your phone's own hotspot works too: turn it on, join it from the computer, then sync as usual. Nothing goes over the internet either way."));
   }
 
   // ---- Main screen -------------------------------------------------------------
