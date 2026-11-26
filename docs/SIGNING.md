@@ -1,22 +1,28 @@
 # Signing releases
 
-This repository is public and holds no secrets. Signing is done by a separate **private** repository, `BarksAndBytes/signing`, which holds the Android key and a fine-grained token scoped to this repository.
+Tagged releases are built and signed by GitHub Actions. The Android key is stored in this repository's secrets:
+
+| Secret | What it is |
+| --- | --- |
+| `ANDROID_KEYSTORE_B64` | the PKCS12 keystore, base64 |
+| `ANDROID_KEYSTORE_PASSWORD` | its password (also the key password) |
+| `ANDROID_KEY_ALIAS` | `work-dashboard` |
+
+Optional variable `ANDROID_CERT_SHA256`: the certificate fingerprint. Signing is refused if the key doesn't match.
+
+The key was created by the one-time **Generate Android release key** workflow in the private `BarksAndBytes/signing` repository. It refuses to replace an existing key and leaves a 1-day backup artifact on its run: download it, keep it offline, delete the artifact.
+
+## How the key is protected
+
+- GitHub never passes secrets to workflows from forks' pull requests.
+- The build jobs (npm, cargo) get no secrets. Signing is a separate job that only runs `apksigner` on the built APK.
+- Only `v*` tags start the release workflow.
 
 ## Each release
 
-1. Tag the version here: `git tag v0.1.0` then `git push origin v0.1.0`.
-2. The **Release build** workflow creates a draft release with the unsigned APK and the Windows installer.
-3. In the signing repository, run **Actions → Sign Project-planner release** (tag blank = newest draft) and approve it.
-4. It replaces the unsigned APK with the signed one and refreshes `SHA256SUMS.txt`.
-5. Back here, review the draft release and publish it.
-
-Setup steps (key, token, secrets) are in the signing repository's README.
-
-## Why a separate repository
-
-- Workflows in this public repo, including any from pull requests or a compromised dependency, have no path to the key.
-- The signing workflow runs only Google's `apksigner` on an already-built file, after your approval.
-- An optional fingerprint check refuses to sign if the key is ever swapped.
+1. Tag the version: `git tag v0.1.0` then `git push origin v0.1.0`.
+2. The **Release build** workflow builds both installers, signs the APK, and creates a draft release with `SHA256SUMS.txt`.
+3. Review the draft and publish it.
 
 ## Signing by hand (fallback)
 

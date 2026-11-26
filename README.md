@@ -14,7 +14,7 @@ The full design is in the application spec (kept as a Claude doc; section number
 | Themes: Shop Steel, Datasheet Cobalt, Survey Magenta × light/dark/follow | Done |
 | Local storage: atomic saves, encrypted at rest (XChaCha20-Poly1305; key protected by Windows Data Protection or Android Keystore) | Done, needs a device test |
 | Android cloud backup and device transfer turned off for app data | Done |
-| Release builds from tags, APK signed by the private signing repo ([docs/SIGNING.md](docs/SIGNING.md)) | Done; needs your key set up. Windows installer unsigned for now |
+| Release builds from tags, APK signed in CI from repository secrets ([docs/SIGNING.md](docs/SIGNING.md)) | Done; needs your key set up. Windows installer unsigned for now |
 | Sync (phase 2), export (3), voice (4), polish (5), teams (6) | Later |
 
 ## Try it
