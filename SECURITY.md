@@ -9,7 +9,7 @@ Work Dashboard keeps your data only on your own devices. Every release goes thro
 | 1 | Output escaping | Screens build the DOM with text nodes only. `tests/static-scan.test.js` fails the build if `innerHTML`, `eval` or similar appear. |
 | 2 | No secrets in code | `.gitignore` blocks key files; GitHub secret scanning with push protection (enable in repo settings). |
 | 3 | Dependencies locked and audited | No runtime JavaScript dependencies. Rust: `tauri` only. Dependabot for npm, cargo and Actions. |
-| 4 | Signed builds | Tagged releases are built by Actions and signed offline with your key (`scripts/sign-android.ps1`, [docs/SIGNING.md](docs/SIGNING.md)). Windows installer unsigned until a free OSS certificate is arranged. |
+| 4 | Signed builds | Tagged releases are signed in CI by a separate job in the protected `release` environment: build jobs get no secrets, signing needs your approval, and the certificate fingerprint is checked ([docs/SIGNING.md](docs/SIGNING.md)). Windows installer unsigned until a free OSS certificate is arranged. |
 | 5 | Network lockdown | Strict CSP; only `core:default` permissions; static scan blocks `fetch`, WebSocket and external URLs in the screens. |
 | 6 | Pairing and sync | Phase 2. |
 | 7 | Incoming data validated | Saved data is re-validated record by record on load (`store.load`). |

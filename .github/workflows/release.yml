@@ -1,7 +1,13 @@
-# Builds release installers from a version tag (e.g. v0.1.0) and attaches
-# them, unsigned, to a draft GitHub release. Signing happens afterwards on
-# Scott's own computer with his offline keys (spec 7, items 4 and 9);
-# see docs/SIGNING.md. No signing key is ever given to GitHub.
+# Builds release installers from a version tag (e.g. v0.1.0), signs the
+# Android APK, and attaches everything to a draft GitHub release.
+#
+# Key safety (spec 7, items 4 and 9):
+# - The build jobs run npm and cargo but get no secrets.
+# - Signing is its own job in the "release" environment, which holds the key
+#   as encrypted secrets and requires your approval before it runs. It only
+#   runs apksigner on the built file.
+# - Tags only; pull requests and branch pushes never reach the key.
+# See docs/SIGNING.md.
 name: Release build
 
 on:
@@ -54,12 +60,40 @@ jobs:
           .github/scripts/run-logged.sh npx tauri android build --apk --ci
       - uses: actions/upload-artifact@v4
         with:
-          name: android
+          name: android-unsigned
           path: src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
 
+  sign-android:
+    needs: android
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-unsigned
+          path: apk
+      - name: Sign
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          EXPECTED_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
+        run: |
+          find apk -mindepth 2 -name '*-unsigned.apk' -exec mv {} apk/ \;
+          .github/scripts/sign-apk.sh apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: apk/*-signed.apk
+          if-no-files-found: error
+
   draft-release:
-    needs: [windows, android]
+    needs: [windows, sign-android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -69,14 +103,15 @@ jobs:
           path: out
       - name: Checksums
         run: |
+          rm -rf out/android-unsigned
           cd out
-          find . -type f \( -name '*.msi' -o -name '*.apk' \) -exec sha256sum {} + | sed 's#\./[^/]*/##' > SHA256SUMS-unsigned.txt
-          cat SHA256SUMS-unsigned.txt
+          find . -type f \( -name '*.msi' -o -name '*.apk' \) -exec sha256sum {} + | sed 's#\./[^/]*/##' > SHA256SUMS.txt
+          cat SHA256SUMS.txt
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
             --title "Work Dashboard $GITHUB_REF_NAME" \
-            --notes "Unsigned build from tag $GITHUB_REF_NAME. Sign with your offline keys (docs/SIGNING.md), upload the signed files, then publish." \
-            $(find out -type f \( -name '*.msi' -o -name '*.apk' -o -name 'SHA256SUMS-unsigned.txt' \))
+            --notes "Built and signed by GitHub Actions from tag $GITHUB_REF_NAME. Android APK signed with the release key; Windows installer unsigned (docs/SIGNING.md). Check SHA256SUMS.txt, then publish." \
+            $(find out -type f \( -name '*.msi' -o -name '*.apk' -o -name 'SHA256SUMS.txt' \))
