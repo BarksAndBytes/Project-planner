@@ -35,7 +35,7 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
   let settings = normalizeSettings().value;
   let settingsClocks = {};
   // Device-local state: saved with the data but never synced.
-  let local = { lastSync: {} };
+  let local = { lastSync: {}, lastBackup: null };
   // Returns a reason string when local edits aren't allowed (view-only device).
   let guard = () => null;
   const listeners = new Set();
@@ -77,10 +77,13 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
 
     setGuard(fn) { guard = fn ?? (() => null); },
+    /** Tells the screens to redraw (after a silent merge). */
+    notify() { emit(); },
     readOnlyReason() { return guard(); },
 
     getLocal() { return structuredClone(local); },
     setLastSync(peerId, iso) { local.lastSync[peerId] = iso; emit(); },
+    setLastBackup(iso) { local.lastBackup = iso; emit(); },
 
     get(c, id) {
       assertCollection(c);
@@ -329,7 +332,8 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
           data[c].set(r.id, finish(r.id, value, clocks, createdAt));
         }
       }
-      local = { lastSync: {} };
+      local = { lastSync: {}, lastBackup: null };
+      if (typeof doc.local?.lastBackup === "string" && !Number.isNaN(Date.parse(doc.local.lastBackup))) local.lastBackup = new Date(doc.local.lastBackup).toISOString();
       if (doc.local && typeof doc.local.lastSync === "object" && doc.local.lastSync) {
         for (const [k, v] of Object.entries(doc.local.lastSync)) {
           if (ID_RE.test(k) && typeof v === "string" && !Number.isNaN(Date.parse(v))) local.lastSync[k] = new Date(v).toISOString();

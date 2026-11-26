@@ -77,9 +77,9 @@ function navigate(hash) {
   else location.hash = hash;
 }
 
-function openQuickLog(projectId, entryId) {
+function openQuickLog(projectId, entryId, type) {
   clear(dialog);
-  dialog.append(entryForm(store, { projectId, entryId, confirm: confirmDialog, onDone: () => dialog.close() }));
+  dialog.append(entryForm(store, { projectId, entryId, type, confirm: confirmDialog, onDone: () => dialog.close() }));
   if (!dialog.open) dialog.showModal();
 }
 
@@ -117,7 +117,7 @@ function render() {
         ? projectFormView(store, { id: parts[1], navigate })
         : projectView(store, { ...ctx, id: parts[1], tab: parts[2] });
       break;
-    case "settings": view = settingsView(store, { version: VERSION, native: isNative() }); nav = "settings"; break;
+    case "settings": view = settingsView(store, { version: VERSION, native: isNative(), isAndroid: /Android/i.test(navigator.userAgent) }); nav = "settings"; break;
     case "export": view = exportView(store, { projectId: parts[1] ?? null, isAndroid: /Android/i.test(navigator.userAgent) }); nav = "projects"; break;
     case "sync": view = syncView(store, { deviceId, isAndroid: /Android/i.test(navigator.userAgent), confirm: confirmDialog, hold }); nav = "settings"; break;
     case "netcheck": view = netcheckView({ isAndroid: /Android/i.test(navigator.userAgent) }); nav = "settings"; break;

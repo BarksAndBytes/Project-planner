@@ -18,7 +18,7 @@ function b64(bytes) {
   return btoa(s);
 }
 
-async function saveFile(name, bytes, mime, status, isAndroid) {
+export async function saveFile(name, bytes, mime, status, isAndroid) {
   const t = tauri();
   if (!t) {
     // Development in a browser: a normal download.

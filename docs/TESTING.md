@@ -46,6 +46,14 @@ Tick items off (or tell Claude what happened) as you go. Report anything odd wit
 - [ ] Windows: Speak opens Windows voice typing in the box; speaking types the text
 - [ ] Typing "Win: ..." by hand also sets the type when you leave the box
 
+### Backup and reminders (Settings)
+- [ ] Save encrypted backup: Windows saves a .wdbackup file to Downloads; Android opens the share sheet (save it to Drive or a USB stick)
+- [ ] Restore from a backup on another device (or after reinstalling): choose the file, enter the passphrase, projects come back. **Android: check the file picker opens at all** (it may not, in which case restore on Windows for now)
+- [ ] A wrong passphrase is refused with a clear message
+- [ ] Dashboard shows "You haven't saved a backup yet" until you do, and again after a week
+- [ ] Turn on the Friday reminder: on a Friday the dashboard asks about the week's wins and "Log a win" opens Quick log as a Success
+- [ ] Set "Date of your last review", then Work summary → "Since my last review" starts there
+
 ## Done
 - [x] Android: install, basic screens, status bar spacing, Quick log (Nov 26)
 - [x] Android: network check on home Wi-Fi (Nov 26)

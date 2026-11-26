@@ -202,3 +202,6 @@ ol.steps li { margin-bottom: .35rem; }
 /* Voice */
 .label-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .btn.mic { min-height: 40px; padding: 0 .9rem; }
+
+.reminder { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; background: var(--surf); border: 1px solid var(--line); border-left: 4px solid var(--block); border-radius: var(--radius); padding: .5rem .75rem; margin-bottom: .75rem; }
+.reminder.nudge { border-left-color: var(--ok); }

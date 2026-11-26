@@ -5,9 +5,11 @@ import {
   PROJECT_TYPES, STATUSES, PRIORITIES, LOG_TYPES, LOG_TYPE_LABELS, IMPACTS, LIMITS,
   todayISO, describeChange,
 } from "./model.js";
-import { dashboardStats, ValidationError } from "./store.js";
+import { dashboardStats, ValidationError, addDays } from "./store.js";
 import { PALETTES, TYPE_TOKEN } from "./themes.js";
 import { detectType, listen, voiceAvailable, VOICE_HELP } from "./voice.js";
+import { createBackup, restoreBackup, MIN_PASSPHRASE } from "./backup.js";
+import { saveFile } from "./export.js";
 
 // ---- Shared bits ---------------------------------------------------------
 
@@ -47,13 +49,33 @@ function empty(text, action) {
 
 // ---- Dashboard -----------------------------------------------------------
 
+export function dashboardReminders(store, today = todayISO(), now = new Date()) {
+  const out = [];
+  const settings = store.getSettings();
+  const hasData = store.list("projects").length > 0;
+  const last = store.getLocal().lastBackup;
+  if (hasData && (!last || now - Date.parse(last) > 7 * 24 * 3600 * 1000)) {
+    out.push({ kind: "backup", text: last ? "It's been over a week since your last backup." : "You haven't saved a backup yet.", action: "Save a backup", href: "#/settings" });
+  }
+  const dow = new Date(`${today}T12:00:00Z`).getUTCDay();
+  if (settings.weeklyNudge && (dow === 5 || dow === 6)) {
+    const monday = addDays(today, -((dow + 6) % 7));
+    const wins = store.list("log", (e) => e.type === "success" && e.date >= monday && e.date <= today).length;
+    out.push({ kind: "nudge", text: wins ? `${wins} win${wins === 1 ? "" : "s"} logged this week. Anything else go well?` : "Anything go well this week? Log it while it's fresh.", action: "Log a win" });
+  }
+  return out;
+}
+
 export function dashboardView(store, { openQuickLog, sync }) {
   const s = dashboardStats(store, todayISO());
+  const reminders = dashboardReminders(store);
   const kpi = (n, label, warn) => h("div", { class: `kpi${warn && n ? " warn" : ""}` }, h("div", { class: "n" }, String(n)), h("div", { class: "t" }, label));
 
   return h("section", { class: "view" },
     sync ? h("a", { class: `sync-line${sync.stale ? " stale" : ""}`, href: "#/sync" },
       sync.text, sync.stale ? " · Sync now" : "") : null,
+    reminders.map((r) => h("div", { class: `reminder ${r.kind}` }, h("span", {}, r.text),
+      r.href ? h("a", { class: "btn", href: r.href }, r.action) : h("button", { class: "btn", onclick: () => openQuickLog(null, null, "success") }, r.action))),
     h("div", { class: "kpis" },
       kpi(s.active, "Active"), kpi(s.onHold, "On hold"), kpi(s.dueThisWeek, "Due this week"), kpi(s.overdue, "Overdue", true)),
     h("button", { class: "quicklog", onclick: () => openQuickLog() }, "Quick log"),
@@ -319,9 +341,9 @@ logPanel.state = {};
 
 // ---- Quick log / entry editor (dialog) ------------------------------------
 
-export function entryForm(store, { projectId, entryId, onDone, confirm }) {
+export function entryForm(store, { projectId, entryId, type, onDone, confirm }) {
   const existing = entryId ? store.get("log", entryId) : null;
-  const e = existing ?? { type: "success", date: todayISO(), impact: [], projectId };
+  const e = existing ?? { type: type ?? "success", date: todayISO(), impact: [], projectId };
   const projects = store.list("projects", (p) => !p.archived).sort((a, b) => a.name.localeCompare(b.name));
   const errors = errorBox();
   if (!projects.length) {
@@ -407,7 +429,64 @@ export function entryForm(store, { projectId, entryId, onDone, confirm }) {
 
 // ---- Settings -------------------------------------------------------------
 
-export function settingsView(store, { version, native }) {
+function reviewDateField(store) {
+  const input = h("input", { type: "date", value: store.getSettings().lastReviewDate ?? "", "aria-label": "Date of your last review" });
+  input.addEventListener("change", () => { try { store.updateSettings({ lastReviewDate: input.value || null }); } catch { /* view-only */ } });
+  return field("Date of your last review", input, "Used by \"Since my last review\" in Work summary.");
+}
+
+// Survives the redraw that follows a backup or restore.
+let backupMessage = null;
+
+function backupCard(store, { isAndroid }) {
+  const status = h("div", { role: "status" });
+  if (backupMessage) { fill(status, backupMessage); backupMessage = null; }
+  const keep = () => { backupMessage = [...status.childNodes]; };
+  const pass1 = h("input", { type: "password", autocomplete: "new-password", placeholder: "Passphrase", "aria-label": "Passphrase" });
+  const pass2 = h("input", { type: "password", autocomplete: "new-password", placeholder: "Repeat passphrase", "aria-label": "Repeat passphrase" });
+  const saveBtn = h("button", { class: "btn primary", type: "button", onclick: async () => {
+    if (pass1.value !== pass2.value) { fill(status, h("p", { class: "errors" }, "The passphrases don't match.")); return; }
+    if (pass1.value.length < MIN_PASSPHRASE) { fill(status, h("p", { class: "errors" }, `Use at least ${MIN_PASSPHRASE} characters.`)); return; }
+    saveBtn.disabled = true;
+    fill(status, h("p", { class: "muted" }, "Encrypting…"));
+    try {
+      const bytes = await createBackup(store, pass1.value);
+      await saveFile(`Work Dashboard backup ${todayISO()}.wdbackup`, bytes, "application/octet-stream", status, isAndroid);
+      pass1.value = ""; pass2.value = "";
+      keep();
+      store.setLastBackup(new Date().toISOString());
+    } catch (err) { fill(status, h("p", { class: "errors" }, String(err.message ?? err))); }
+    saveBtn.disabled = false;
+  } }, "Save encrypted backup");
+
+  const file = h("input", { type: "file", accept: ".wdbackup,application/octet-stream,application/json", "aria-label": "Backup file" });
+  const pass3 = h("input", { type: "password", autocomplete: "current-password", placeholder: "Passphrase", "aria-label": "Backup passphrase" });
+  const restoreBtn = h("button", { class: "btn", type: "button", onclick: async () => {
+    const f = file.files?.[0];
+    if (!f) { fill(status, h("p", { class: "errors" }, "Choose a backup file first.")); return; }
+    restoreBtn.disabled = true;
+    fill(status, h("p", { class: "muted" }, "Decrypting…"));
+    try {
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      const msg = (r) => h("p", { class: "ok" }, `Restored ${r.applied} item(s) from the backup made ${r.created.slice(0, 10)}. Anything newer on this device was kept.`);
+      const r = await restoreBackup(store, bytes, pass3.value, { silent: true });
+      pass3.value = "";
+      fill(status, msg(r));
+      keep();
+      store.notify();
+    } catch (err) { fill(status, h("p", { class: "errors" }, String(err.message ?? err))); }
+    restoreBtn.disabled = false;
+  } }, "Restore");
+
+  return h("div", { class: "card" }, h("h2", {}, "Backup"),
+    h("p", { class: "small muted" }, "Each device keeps a full copy, but if you lose them all, a backup is the only way back. The file is encrypted with your passphrase: write it down, because it can't be recovered."),
+    h("div", { class: "row3" }, pass1, pass2), h("div", { class: "actions" }, saveBtn),
+    h("details", { class: "manual" }, h("summary", {}, "Restore from a backup"),
+      h("div", { class: "form" }, file, pass3, h("div", { class: "actions" }, restoreBtn))),
+    status);
+}
+
+export function settingsView(store, { version, native, isAndroid = false }) {
   const s = store.getSettings();
   const swatches = (pal, mode) => h("div", { class: "swatches", style: { background: pal[mode].bg } },
     ["surf", "acc", "ok", "fail", "block"].map((k) => h("i", { style: { background: pal[mode][k] } })));
@@ -424,6 +503,10 @@ export function settingsView(store, { version, native }) {
           class: s.mode === m ? "on" : "", role: "radio", "aria-checked": s.mode === m ? "true" : "false",
           onclick: () => store.updateSettings({ mode: m }),
         }, label)))),
+    h("div", { class: "card" }, h("h2", {}, "Reviews and reminders"),
+      reviewDateField(store),
+      toggle(store, "weeklyNudge", "On Fridays, remind me to log the week's wins")),
+    backupCard(store, { native, isAndroid }),
     h("div", { class: "card" }, h("h2", {}, "Automatic log entries"),
       toggle(store, "autoLogStage", "Log a success when a project reaches its next stage"),
       toggle(store, "autoLogTasks", "Log a success when a task is completed")),
