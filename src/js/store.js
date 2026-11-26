@@ -35,7 +35,7 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
   let settings = normalizeSettings().value;
   let settingsClocks = {};
   // Device-local state: saved with the data but never synced.
-  let local = { lastSync: {}, lastBackup: null };
+  let local = { lastSync: {}, lastBackup: null, appLock: null, kiosk: null, lockout: { fails: 0, until: 0 } };
   // Returns a reason string when local edits aren't allowed (view-only device).
   let guard = () => null;
   const listeners = new Set();
@@ -84,6 +84,11 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
     getLocal() { return structuredClone(local); },
     setLastSync(peerId, iso) { local.lastSync[peerId] = iso; emit(); },
     setLastBackup(iso) { local.lastBackup = iso; emit(); },
+    /** Device-local passcode records and lockout (lock.js). Never synced. */
+    setLocks(patch) {
+      for (const k of ["appLock", "kiosk", "lockout"]) if (Object.hasOwn(patch, k)) local[k] = structuredClone(patch[k]);
+      emit();
+    },
 
     get(c, id) {
       assertCollection(c);
@@ -332,7 +337,12 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
           data[c].set(r.id, finish(r.id, value, clocks, createdAt));
         }
       }
-      local = { lastSync: {}, lastBackup: null };
+      local = { lastSync: {}, lastBackup: null, appLock: null, kiosk: null, lockout: { fails: 0, until: 0 } };
+      const rec = (r) => (r && /^[0-9a-f]{32}$/.test(r.salt) && /^[0-9a-f]{64}$/.test(r.hash) && Number.isInteger(r.iterations) ? { salt: r.salt, hash: r.hash, iterations: r.iterations } : null);
+      local.appLock = rec(doc.local?.appLock);
+      if (doc.local?.kiosk && rec(doc.local.kiosk.passcode)) local.kiosk = { enabled: doc.local.kiosk.enabled === true, passcode: rec(doc.local.kiosk.passcode) };
+      const lo = doc.local?.lockout;
+      if (lo && Number.isInteger(lo.fails) && Number.isFinite(lo.until)) local.lockout = { fails: Math.max(0, lo.fails), until: lo.until };
       if (typeof doc.local?.lastBackup === "string" && !Number.isNaN(Date.parse(doc.local.lastBackup))) local.lastBackup = new Date(doc.local.lastBackup).toISOString();
       if (doc.local && typeof doc.local.lastSync === "object" && doc.local.lastSync) {
         for (const [k, v] of Object.entries(doc.local.lastSync)) {

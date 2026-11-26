@@ -120,3 +120,24 @@ test("Word export escapes text and contains every section", () => {
   const bytes = summaryToDocx(sum);
   assert.ok(bytes.length > 2000);
 });
+
+import { claudePrompt } from "../src/js/summary.js";
+import { searchItems } from "../src/js/search.js";
+
+test("Copy for Claude includes the prompt and entries, challenges only when asked", () => {
+  const { s } = seeded();
+  const text = claudePrompt(s, { period: NOV });
+  assert.match(text, /^Write a confident, factual self-assessment/);
+  assert.match(text, /Shipped 2 days early/);
+  assert.ok(!text.includes("Gripper dropped"));
+  assert.match(claudePrompt(s, { period: NOV, includeChallenges: true }), /Gripper dropped parts at speed \[lesson: Validate/);
+});
+
+test("search finds projects by customer, tasks, and log text", () => {
+  const { s } = seeded();
+  const r = searchItems(s, "acme");
+  assert.equal(r.projects[0].name, "Z3860 Collet");
+  assert.equal(searchItems(s, "4420").tasks.length, 1);
+  assert.equal(searchItems(s, "grip force").log.length, 1);
+  assert.equal(searchItems(s, "a").projects.length, 0);
+});

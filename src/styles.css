@@ -205,3 +205,12 @@ ol.steps li { margin-bottom: .35rem; }
 
 .reminder { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; background: var(--surf); border: 1px solid var(--line); border-left: 4px solid var(--block); border-radius: var(--radius); padding: .5rem .75rem; margin-bottom: .75rem; }
 .reminder.nudge { border-left-color: var(--ok); }
+
+/* Locks */
+body.locked .sidebar { display: none; }
+.lock-screen { min-height: 70vh; display: flex; align-items: center; justify-content: center; }
+.lock-form { width: min(360px, 100%); background: var(--surf); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem; }
+.lock-form input { width: 100%; font-size: 1.3rem; letter-spacing: .2em; text-align: center; margin: .5rem 0; }
+.kiosk-bar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; padding: .5rem .75rem; margin-bottom: .75rem; border-radius: var(--radius); background: var(--sunk); border-left: 4px solid var(--block); font-weight: 600; }
+.kiosk-bar.unlocked { border-left-color: var(--ok); }
+body.kiosk { --tap: 56px; font-size: 18px; }

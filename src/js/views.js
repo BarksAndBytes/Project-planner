@@ -10,6 +10,8 @@ import { PALETTES, TYPE_TOKEN } from "./themes.js";
 import { detectType, listen, voiceAvailable, VOICE_HELP } from "./voice.js";
 import { createBackup, restoreBackup, MIN_PASSPHRASE } from "./backup.js";
 import { saveFile } from "./export.js";
+import { appLockCard, kioskCard } from "./lockui.js";
+import { VERSION_LOG } from "./version-log.js";
 
 // ---- Shared bits ---------------------------------------------------------
 
@@ -123,6 +125,7 @@ export function projectsView(store, state) {
     h("div", { class: "toolbar" },
       search, statusSel, typeSel,
       h("label", { class: "check" }, arch, " Archived"),
+      h("a", { class: "btn", href: "#/search" }, "Search all"),
       h("a", { class: "btn", href: "#/export" }, "Work summary"),
       h("a", { class: "btn primary", href: "#/new" }, "New project")),
     projects.length ? h("ul", { class: "cards" }, projects.map((p) => {
@@ -507,6 +510,8 @@ export function settingsView(store, { version, native, isAndroid = false }) {
       reviewDateField(store),
       toggle(store, "weeklyNudge", "On Fridays, remind me to log the week's wins")),
     backupCard(store, { native, isAndroid }),
+    native ? appLockCard(store) : null,
+    native ? kioskCard(store) : null,
     h("div", { class: "card" }, h("h2", {}, "Automatic log entries"),
       toggle(store, "autoLogStage", "Log a success when a project reaches its next stage"),
       toggle(store, "autoLogTasks", "Log a success when a task is completed")),
@@ -515,10 +520,15 @@ export function settingsView(store, { version, native, isAndroid = false }) {
       h("div", { class: "actions" },
         h("a", { class: "btn primary", href: "#/sync" }, "Sync and devices"),
         h("a", { class: "btn", href: "#/netcheck" }, "Network check"))),
+    h("div", { class: "card" }, h("h2", {}, "Claude add-on"),
+      h("p", { class: "small muted" }, "Off by default. When on, Work summary gets a Copy for Claude button that copies the selected entries with a ready-made prompt for you to paste into Claude. Nothing is ever sent automatically."),
+      toggle(store, "claudeAddon", "Show Copy for Claude")),
     h("div", { class: "card" }, h("h2", {}, "About"),
       h("p", {}, `Work Dashboard ${version}`),
       h("p", { class: "small muted" }, native ? "Data is stored only on this device." : "Development mode: running in a browser, data kept in this browser only."),
-      h("p", { class: "small muted" }, "Export, backup and voice arrive in later phases.")));
+      h("details", { class: "manual" }, h("summary", {}, "Version and security log"),
+        h("ul", { class: "rows small" }, VERSION_LOG.map((v) => h("li", {}, h("div", {},
+          h("strong", {}, `${v.version} · ${v.date}`), h("div", {}, v.changes), h("div", { class: "muted" }, `Security checks: ${v.checks}`))))))));
 }
 
 function toggle(store, key, label) {

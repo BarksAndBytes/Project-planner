@@ -75,6 +75,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   ownerName: "",
   exportIncludeTasks: false,
   exportIncludeRecognition: true,
+  claudeAddon: false,
 });
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -247,7 +248,7 @@ export function normalizeSettings(input = {}) {
   if (["A", "B", "C"].includes(input.palette)) s.palette = input.palette;
   if (["light", "dark", "auto"].includes(input.mode)) s.mode = input.mode;
   if (typeof input.ownerName === "string") s.ownerName = str(input.ownerName, 60);
-  for (const k of ["exportIncludeFailures", "weeklyNudge", "autoLogStage", "autoLogTasks", "exportIncludeTasks", "exportIncludeRecognition"]) {
+  for (const k of ["exportIncludeFailures", "weeklyNudge", "autoLogStage", "autoLogTasks", "exportIncludeTasks", "exportIncludeRecognition", "claudeAddon"]) {
     if (typeof input[k] === "boolean") s[k] = input[k];
   }
   if (["month", "quarter", "year", "review"].includes(input.exportDefaultRange)) s.exportDefaultRange = input.exportDefaultRange;

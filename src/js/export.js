@@ -3,7 +3,7 @@
 
 import { h, fill, field, select } from "./dom.js";
 import { PROJECT_TYPES } from "./model.js";
-import { buildSummary, periodRange, summaryToText, entriesToCsv, fmtDate } from "./summary.js";
+import { buildSummary, periodRange, summaryToText, entriesToCsv, fmtDate, claudePrompt } from "./summary.js";
 import { summaryToDocx } from "./docx.js";
 
 const tauri = () => globalThis.__TAURI__?.core;
@@ -128,7 +128,13 @@ export function exportView(store, { projectId = null, isAndroid }) {
       catch { fill(status, h("p", { class: "errors" }, "Couldn't copy on this device.")); }
     } }, "Copy as text"),
     h("button", { class: "btn", onclick: () => saveFile(`${fileBase()} - log entries.csv`, new TextEncoder().encode(entriesToCsv(store, opts())), "text/csv", status, isAndroid) }, "CSV"),
-    !isAndroid ? h("button", { class: "btn", onclick: () => window.print() }, "Print / PDF") : null);
+    !isAndroid ? h("button", { class: "btn", onclick: () => window.print() }, "Print / PDF") : null,
+    store.getSettings().claudeAddon ? h("button", { class: "btn", onclick: async () => {
+      try {
+        await navigator.clipboard.writeText(claudePrompt(store, opts()));
+        fill(status, h("p", { class: "ok" }, "Copied the entries with a ready-made prompt. Paste it into Claude yourself; nothing was sent."));
+      } catch { fill(status, h("p", { class: "errors" }, "Couldn't copy on this device.")); }
+    } }, "Copy for Claude") : null);
 
   fill(root,
     h("div", { class: "card no-print" },

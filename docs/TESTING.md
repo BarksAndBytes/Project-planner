@@ -54,6 +54,14 @@ Tick items off (or tell Claude what happened) as you go. Report anything odd wit
 - [ ] Turn on the Friday reminder: on a Friday the dashboard asks about the week's wins and "Log a win" opens Quick log as a Success
 - [ ] Set "Date of your last review", then Work summary → "Since my last review" starts there
 
+### App lock, kiosk mode, search, Claude add-on (Settings)
+- [ ] App lock: turn on, close the app fully, reopen: it asks for the passcode; wrong passcode is refused; 5 wrong tries block entry for 5 minutes
+- [ ] Kiosk mode on a tablet or spare PC: everything visible but read-only; Unlock with its passcode allows changes; it relocks after 5 idle minutes and on Lock; touch targets are bigger
+- [ ] Sync still works on a locked kiosk (it receives changes), but Add a phone and device changes are hidden
+- [ ] Projects → Search all finds projects (by customer, part number…), tasks and log entries
+- [ ] Settings → Claude add-on → Work summary shows Copy for Claude; pasting into Claude gives the prompt and entries
+- [ ] Settings → About → Version and security log opens
+
 ## Done
 - [x] Android: install, basic screens, status bar spacing, Quick log (Nov 26)
 - [x] Android: network check on home Wi-Fi (Nov 26)

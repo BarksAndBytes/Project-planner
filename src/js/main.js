@@ -8,8 +8,11 @@ import { dashboardView, projectsView, projectFormView, projectView, entryForm, s
 import { netcheckView } from "./netcheck.js";
 import { syncView, syncSummary } from "./syncui.js";
 import { exportView } from "./export.js";
+import { searchView } from "./search.js";
+import { lockScreen, verify, passcodeForm } from "./lockui.js";
+import { validRecord, KIOSK_IDLE_MS } from "./lock.js";
 
-const VERSION = "0.2.0-dev";
+const VERSION = "0.2.0 (test build)";
 const main = document.getElementById("main");
 const status = document.getElementById("status");
 const dialog = document.getElementById("sheet");
@@ -18,6 +21,10 @@ const listState = { rerender: () => render() };
 
 let store;
 let deviceId;
+let appLocked = false;
+let kioskUnlocked = false;
+let idleTimer = null;
+const kioskOn = () => Boolean(store.getLocal().kiosk?.enabled);
 // While a sync session runs, redraws wait so the session's screen isn't replaced.
 let holds = 0;
 let pendingRender = false;
@@ -32,8 +39,11 @@ async function hold(fn) {
 async function boot() {
   deviceId = await getDeviceId();
   store = createStore({ deviceId });
-  store.setGuard(() => (store.get("devices", deviceId)?.role === "view-only"
-    ? "This device is view-only. Change its role from another device in Settings → Sync." : null));
+  store.setGuard(() => {
+    if (store.get("devices", deviceId)?.role === "view-only") return "This device is view-only. Change its role from another device in Settings → Sync.";
+    if (kioskOn() && !kioskUnlocked) return "This kiosk is locked. Tap Unlock and enter its passcode to make changes.";
+    return null;
+  });
   try {
     const raw = await loadRaw();
     if (raw) {
@@ -58,8 +68,46 @@ async function boot() {
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") save.flush(); });
   dialog.addEventListener("close", () => clear(dialog));
 
+  appLocked = validRecord(store.getLocal().appLock);
+  for (const ev of ["pointerdown", "keydown"]) addEventListener(ev, resetIdle, { passive: true });
   theme();
   render();
+}
+
+function resetIdle() {
+  if (!kioskOn() || !kioskUnlocked) return;
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(lockKiosk, KIOSK_IDLE_MS);
+}
+
+function lockKiosk() {
+  kioskUnlocked = false;
+  clearTimeout(idleTimer);
+  if (dialog.open) dialog.close();
+  location.hash = "#/";
+  render();
+}
+
+function unlockKiosk() {
+  clear(dialog);
+  dialog.append(passcodeForm({
+    title: "Unlock kiosk",
+    intro: "Enter this kiosk's passcode to make changes.",
+    onCancel: () => dialog.close(),
+    onSubmit: async (p) => {
+      const msg = await verify(store, store.getLocal().kiosk.passcode, p);
+      if (!msg) { kioskUnlocked = true; dialog.close(); resetIdle(); render(); }
+      return msg;
+    },
+  }));
+  dialog.showModal();
+}
+
+function kioskBanner() {
+  if (!kioskOn()) return null;
+  return kioskUnlocked
+    ? h("div", { class: "kiosk-bar unlocked" }, h("span", {}, "Kiosk unlocked: changes allowed. Locks after 5 idle minutes."), h("button", { class: "btn", onclick: lockKiosk }, "Lock"))
+    : h("div", { class: "kiosk-bar" }, h("span", {}, "Kiosk locked: read-only."), h("button", { class: "btn primary", onclick: unlockKiosk }, "Unlock"));
 }
 
 function theme() {
@@ -99,6 +147,13 @@ function confirmDialog(message) {
 
 function render() {
   if (holds) { pendingRender = true; return; }
+  document.body.classList.toggle("locked", appLocked);
+  document.body.classList.toggle("kiosk", kioskOn());
+  if (appLocked) {
+    clear(main);
+    main.append(lockScreen(store, () => { appLocked = false; render(); }));
+    return;
+  }
   if (dialog.open) {
     // Keep an open entry form; the underlying view refreshes when it closes.
     dialog.addEventListener("close", render, { once: true });
@@ -118,20 +173,24 @@ function render() {
         : projectView(store, { ...ctx, id: parts[1], tab: parts[2] });
       break;
     case "settings": view = settingsView(store, { version: VERSION, native: isNative(), isAndroid: /Android/i.test(navigator.userAgent) }); nav = "settings"; break;
+    case "search": view = searchView(store); nav = "projects"; break;
     case "export": view = exportView(store, { projectId: parts[1] ?? null, isAndroid: /Android/i.test(navigator.userAgent) }); nav = "projects"; break;
     case "sync": view = syncView(store, { deviceId, isAndroid: /Android/i.test(navigator.userAgent), confirm: confirmDialog, hold }); nav = "settings"; break;
     case "netcheck": view = netcheckView({ isAndroid: /Android/i.test(navigator.userAgent) }); nav = "settings"; break;
     default: view = dashboardView(store, { ...ctx, sync: syncSummary(store, deviceId) });
   }
   const focused = document.activeElement?.closest?.("#main") ? document.activeElement.getAttribute("type") : null;
+  const caret = focused === "search" ? document.activeElement.selectionStart : null;
   clear(main);
+  const banner = kioskBanner();
+  if (banner) main.append(banner);
   main.append(view);
   for (const a of document.querySelectorAll("[data-nav]")) {
     a.classList.toggle("on", a.dataset.nav === nav);
     if (a.dataset.nav === nav) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   }
-  if (focused === "search") main.querySelector("input[type=search]")?.focus();
+  if (focused === "search") { const el = main.querySelector("input[type=search]"); el?.focus(); if (el && caret !== null) el.setSelectionRange(caret, caret); }
 }
 
-document.getElementById("quicklog-tab").addEventListener("click", (ev) => { ev.preventDefault(); openQuickLog(); });
+document.getElementById("quicklog-tab").addEventListener("click", (ev) => { ev.preventDefault(); if (!appLocked) openQuickLog(); });
 boot();

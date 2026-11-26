@@ -249,3 +249,20 @@ export function entriesToCsv(store, { period, projectIds = null }) {
   }
   return lines.join("\r\n") + "\r\n";
 }
+
+// ---- Copy for Claude (spec 10): entries plus a ready-made prompt -------------
+
+export const CLAUDE_PROMPT = "Write a confident, factual self-assessment for my performance review from these entries. Lead with results and numbers. Do not add anything that isn't in them.";
+
+export function claudePrompt(store, { period, projectIds = null, type = null, includeChallenges = false }) {
+  const projects = new Map(store.list("projects").map((p) => [p.id, p]));
+  const ok = (p) => p && (!projectIds || projectIds.includes(p.id)) && (!type || p.type === type);
+  const rows = store.list("log", (e) => ok(projects.get(e.projectId)) && e.date >= period.from && e.date <= period.to && (includeChallenges || e.type !== "failure"))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const lines = rows.map((e) => {
+    const p = projects.get(e.projectId);
+    const extra = [e.impact.length ? `improved: ${e.impact.join(", ")}` : "", e.impactValue !== null ? `${trimNum(e.impactValue)} ${e.impactUnit}`.trim() : "", e.lesson ? `lesson: ${e.lesson}` : "", e.from ? `from: ${e.from}` : "", e.starred ? "highlight" : ""].filter(Boolean).join("; ");
+    return `- ${e.date} | ${p.name} (${PROJECT_TYPES[p.type].label}) | ${e.type} | ${e.text.trim()}${extra ? ` [${extra}]` : ""}`;
+  });
+  return `${CLAUDE_PROMPT}\n\nPeriod: ${period.label}\n\nEntries:\n${lines.join("\n") || "(none)"}\n`;
+}

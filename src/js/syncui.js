@@ -193,10 +193,11 @@ export function syncView(store, { deviceId, isAndroid, confirm, hold = (fn) => f
 
   // ---- Main screen -------------------------------------------------------------
   function deviceRow(d) {
+    const ro = Boolean(store.readOnlyReason());
     const self = d.id === deviceId;
     const last = store.getLocal().lastSync[d.id];
     const role = select("role", [["full", "Full"], ["view-only", "View-only"]], d.role);
-    role.disabled = self;
+    role.disabled = self || ro;
     role.setAttribute("aria-label", `Role for ${d.name}`);
     role.addEventListener("change", () => store.update("devices", d.id, { role: role.value }));
     return h("li", {},
@@ -204,7 +205,7 @@ export function syncView(store, { deviceId, isAndroid, confirm, hold = (fn) => f
         h("strong", {}, d.name), self ? h("span", { class: "chip" }, "This device") : null,
         h("div", { class: "small muted" }, self ? d.kind : `${d.kind} · last synced with this device: ${since(last)}`)),
       role,
-      self ? null : h("button", { class: "link danger", "aria-label": `Remove ${d.name}`, onclick: async () => {
+      self || ro ? null : h("button", { class: "link danger", "aria-label": `Remove ${d.name}`, onclick: async () => {
         if (await confirm(`Remove ${d.name} from the sync group? It will no longer be able to sync. Its own copy of the data stays on it, so wipe it or use app lock if it's lost.`)) {
           store.remove("devices", d.id);
           render();
@@ -241,6 +242,7 @@ export function syncView(store, { deviceId, isAndroid, confirm, hold = (fn) => f
         isAndroid ? h("p", { class: "small muted" }, "Scan the code from a computer that's in a sync group (Add a phone), or from a new computer's Join screen once this phone is in a group.") : null);
       return;
     }
+    const ro = store.readOnlyReason();
     const devices = store.list("devices").sort((a, b) => (a.id === deviceId ? -1 : b.id === deviceId ? 1 : a.name.localeCompare(b.name)));
     fill(panel,
       banner(),
@@ -250,12 +252,12 @@ export function syncView(store, { deviceId, isAndroid, confirm, hold = (fn) => f
         isAndroid
           ? h("button", { class: "btn primary", onclick: scan }, "Scan code")
           : h("button", { class: "btn primary", onclick: () => showCode("sync") }, "Sync now"),
-        !isAndroid ? h("button", { class: "btn", onclick: () => showCode("invite") }, "Add a phone") : null),
+        !isAndroid && !ro ? h("button", { class: "btn", onclick: () => showCode("invite") }, "Add a phone") : null),
       isAndroid ? h("p", { class: "small muted" }, "Scan the code shown by a computer's Sync now, Add a phone, or Join screen.") : null,
       h("h2", { class: "spaced" }, "Devices in this group"),
       h("ul", { class: "rows devices" }, devices.map(deviceRow)),
       h("h2", { class: "spaced" }, "This device"),
-      renameForm(rec),
+      ro ? h("p", { class: "small muted" }, ro) : renameForm(rec),
       rec.role === "view-only" ? h("p", { class: "small muted" }, "This device is view-only: it can sync and show everything, but can't make changes.") : null);
   }
 
