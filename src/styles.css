@@ -165,3 +165,14 @@ dialog::backdrop { background: rgb(0 0 0 / .45); }
 .big.ok { color: var(--ok); }
 details.manual { margin-top: .75rem; }
 details.manual summary { min-height: var(--tap); display: flex; align-items: center; cursor: pointer; color: var(--acc); font-weight: 600; }
+
+/* Sync */
+.phrase { font-size: 1.4rem; font-weight: 700; text-align: center; letter-spacing: .02em; padding: .75rem; background: var(--sunk); border-radius: var(--radius); }
+.sync-line { display: block; margin-bottom: .75rem; color: var(--muted); text-decoration: none; font-size: .9rem; }
+.sync-line.stale { color: var(--block); font-weight: 600; }
+.devices li { flex-wrap: wrap; }
+.devices select { min-height: 36px; }
+.link.danger { color: var(--fail); }
+h2.spaced { margin-top: 1.25rem; }
+ol.steps { padding-left: 1.25rem; }
+ol.steps li { margin-bottom: .35rem; }

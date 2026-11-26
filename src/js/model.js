@@ -252,11 +252,37 @@ export function normalizeSettings(input = {}) {
   return { value: s, errors: [] };
 }
 
+// Sync group member list (spec 5, devices). A device's id is its device id;
+// publicKey is its Noise identity key (32 bytes, base64).
+export const DEVICE_KINDS = ["phone", "computer", "tablet", "kiosk"];
+export const DEVICE_ROLES = ["full", "view-only"];
+const PUBKEY_RE = /^[A-Za-z0-9+/]{43}=$/;
+
+export function normalizeDevice(input) {
+  const errors = [];
+  const name = str(input.name, 40);
+  if (!name) errors.push("Device name is required.");
+  const publicKey = String(input.publicKey ?? "");
+  if (!PUBKEY_RE.test(publicKey)) errors.push("Device key is missing or invalid.");
+  return {
+    value: {
+      name,
+      kind: DEVICE_KINDS.includes(input.kind) ? input.kind : "computer",
+      role: DEVICE_ROLES.includes(input.role) ? input.role : "full",
+      kioskMode: input.kioskMode === true,
+      publicKey,
+      addedBy: input.addedBy ? str(input.addedBy, 64) : null,
+    },
+    errors,
+  };
+}
+
 export const NORMALIZERS = {
   projects: normalizeProject,
   tasks: normalizeTask,
   log: normalizeLogEntry,
   measurements: normalizeMeasurement,
+  devices: normalizeDevice,
 };
 
 // "Setup time 42 min to 28 min, down 33%, target 25 min"

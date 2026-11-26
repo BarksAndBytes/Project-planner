@@ -6,6 +6,7 @@ import { applyTheme } from "./themes.js";
 import { loadRaw, saveRaw, getDeviceId, isNative, debounce } from "./persist.js";
 import { dashboardView, projectsView, projectFormView, projectView, entryForm, settingsView } from "./views.js";
 import { netcheckView } from "./netcheck.js";
+import { syncView, syncSummary } from "./syncui.js";
 
 const VERSION = "0.2.0-dev";
 const main = document.getElementById("main");
@@ -15,9 +16,23 @@ const darkQuery = matchMedia("(prefers-color-scheme: dark)");
 const listState = { rerender: () => render() };
 
 let store;
+let deviceId;
+// While a sync session runs, redraws wait so the session's screen isn't replaced.
+let holds = 0;
+let pendingRender = false;
+async function hold(fn) {
+  holds++;
+  try { return await fn(); } finally {
+    holds--;
+    if (!holds && pendingRender) { pendingRender = false; render(); }
+  }
+}
 
 async function boot() {
-  store = createStore({ deviceId: await getDeviceId() });
+  deviceId = await getDeviceId();
+  store = createStore({ deviceId });
+  store.setGuard(() => (store.get("devices", deviceId)?.role === "view-only"
+    ? "This device is view-only. Change its role from another device in Settings → Sync." : null));
   try {
     const raw = await loadRaw();
     if (raw) {
@@ -82,6 +97,7 @@ function confirmDialog(message) {
 }
 
 function render() {
+  if (holds) { pendingRender = true; return; }
   if (dialog.open) {
     // Keep an open entry form; the underlying view refreshes when it closes.
     dialog.addEventListener("close", render, { once: true });
@@ -101,8 +117,9 @@ function render() {
         : projectView(store, { ...ctx, id: parts[1], tab: parts[2] });
       break;
     case "settings": view = settingsView(store, { version: VERSION, native: isNative() }); nav = "settings"; break;
+    case "sync": view = syncView(store, { deviceId, isAndroid: /Android/i.test(navigator.userAgent), confirm: confirmDialog, hold }); nav = "settings"; break;
     case "netcheck": view = netcheckView({ isAndroid: /Android/i.test(navigator.userAgent) }); nav = "settings"; break;
-    default: view = dashboardView(store, ctx);
+    default: view = dashboardView(store, { ...ctx, sync: syncSummary(store, deviceId) });
   }
   const focused = document.activeElement?.closest?.("#main") ? document.activeElement.getAttribute("type") : null;
   clear(main);

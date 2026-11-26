@@ -46,11 +46,13 @@ function empty(text, action) {
 
 // ---- Dashboard -----------------------------------------------------------
 
-export function dashboardView(store, { openQuickLog }) {
+export function dashboardView(store, { openQuickLog, sync }) {
   const s = dashboardStats(store, todayISO());
   const kpi = (n, label, warn) => h("div", { class: `kpi${warn && n ? " warn" : ""}` }, h("div", { class: "n" }, String(n)), h("div", { class: "t" }, label));
 
   return h("section", { class: "view" },
+    sync ? h("a", { class: `sync-line${sync.stale ? " stale" : ""}`, href: "#/sync" },
+      sync.text, sync.stale ? " · Sync now" : "") : null,
     h("div", { class: "kpis" },
       kpi(s.active, "Active"), kpi(s.onHold, "On hold"), kpi(s.dueThisWeek, "Due this week"), kpi(s.overdue, "Overdue", true)),
     h("button", { class: "quicklog", onclick: () => openQuickLog() }, "Quick log"),
@@ -397,8 +399,10 @@ export function settingsView(store, { version, native }) {
       toggle(store, "autoLogStage", "Log a success when a project reaches its next stage"),
       toggle(store, "autoLogTasks", "Log a success when a task is completed")),
     h("div", { class: "card" }, h("h2", {}, "Sync"),
-      h("p", { class: "small muted" }, "Phone-to-computer sync is being built. First, check that your devices can reach each other on each network you use."),
-      h("a", { class: "btn", href: "#/netcheck" }, "Network check")),
+      h("p", { class: "small muted" }, "Sync your phone and computers directly over Wi-Fi, with no account or server."),
+      h("div", { class: "actions" },
+        h("a", { class: "btn primary", href: "#/sync" }, "Sync and devices"),
+        h("a", { class: "btn", href: "#/netcheck" }, "Network check"))),
     h("div", { class: "card" }, h("h2", {}, "About"),
       h("p", {}, `Work Dashboard ${version}`),
       h("p", { class: "small muted" }, native ? "Data is stored only on this device." : "Development mode: running in a browser, data kept in this browser only."),

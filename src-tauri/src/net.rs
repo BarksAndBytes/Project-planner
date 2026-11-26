@@ -57,6 +57,29 @@ pub fn local_ipv4() -> Option<Ipv4Addr> {
     None
 }
 
+/// All of this device's local addresses we can find, main network first:
+/// also covers a Windows Mobile Hotspot (192.168.137.x), an Android hotspot
+/// (192.168.43.x) and an iPhone hotspot (172.20.10.x). Used in sync QR codes
+/// so the phone can try each.
+pub fn local_ipv4s() -> Vec<Ipv4Addr> {
+    let mut out: Vec<Ipv4Addr> = Vec::new();
+    let targets = ["192.168.0.1:9", "10.0.0.1:9", "172.16.0.1:9", "8.8.8.8:9", "192.168.137.2:9", "192.168.43.2:9", "172.20.10.2:9"];
+    for target in targets {
+        if let Ok(sock) = UdpSocket::bind("0.0.0.0:0") {
+            if sock.connect(target).is_ok() {
+                if let Ok(SocketAddr::V4(a)) = sock.local_addr() {
+                    let ip = *a.ip();
+                    if !ip.is_unspecified() && !ip.is_loopback() && is_private(IpAddr::V4(ip)) && !out.contains(&ip) {
+                        out.push(ip);
+                    }
+                }
+            }
+        }
+    }
+    out.truncate(4);
+    out
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Status {
     pub listening: bool,

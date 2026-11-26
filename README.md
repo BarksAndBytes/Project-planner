@@ -39,6 +39,10 @@ npx tauri android init        # once, needs Android Studio + NDK
 npx tauri android dev         # phone over USB
 ```
 
+## Device testing
+
+[docs/TESTING.md](docs/TESTING.md) lists what still needs checking on real phones, PCs and networks.
+
 ## Tests
 
 ```sh

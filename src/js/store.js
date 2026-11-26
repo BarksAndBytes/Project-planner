@@ -14,7 +14,7 @@ import {
 } from "./model.js";
 import { createClock, parseStamp, legacyStamp, formatStamp } from "./clock.js";
 
-export const COLLECTIONS = ["projects", "tasks", "log", "measurements"];
+export const COLLECTIONS = ["projects", "tasks", "log", "measurements", "devices"];
 const MAX_RECORDS_PER_COLLECTION = 50000;
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -34,6 +34,10 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
   const data = Object.fromEntries(COLLECTIONS.map((c) => [c, new Map()]));
   let settings = normalizeSettings().value;
   let settingsClocks = {};
+  // Device-local state: saved with the data but never synced.
+  let local = { lastSync: {} };
+  // Returns a reason string when local edits aren't allowed (view-only device).
+  let guard = () => null;
   const listeners = new Set();
   const emit = () => { for (const fn of listeners) fn(); };
 
@@ -63,8 +67,20 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
     return Object.keys(value).filter((k) => !["id", "createdAt", "updatedAt", "deviceId", "schemaVersion", "_c", "_d", "deleted"].includes(k));
   }
 
+  function checkGuard(c) {
+    if (c === "devices") return; // device list changes come from sync/admin flows
+    const reason = guard();
+    if (reason) throw new ValidationError([reason]);
+  }
+
   const store = {
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+
+    setGuard(fn) { guard = fn ?? (() => null); },
+    readOnlyReason() { return guard(); },
+
+    getLocal() { return structuredClone(local); },
+    setLastSync(peerId, iso) { local.lastSync[peerId] = iso; emit(); },
 
     get(c, id) {
       assertCollection(c);
@@ -77,14 +93,16 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
       return [...data[c].values()].filter((r) => !r.deleted && filter(r));
     },
 
-    create(c, fields) {
+    create(c, fields, { id } = {}) {
       assertCollection(c);
+      checkGuard(c);
       const { value, errors } = NORMALIZERS[c](fields);
       if (errors.length) throw new ValidationError(errors);
       if (data[c].size >= MAX_RECORDS_PER_COLLECTION) throw new ValidationError(["Storage limit reached."]);
+      if (id !== undefined && (!ID_RE.test(id) || data[c].has(id))) throw new Error("Invalid or existing id");
       const s = clock.tick();
       const clocks = Object.fromEntries(valueKeys(c, value).map((k) => [k, s]));
-      const record = finish(newId(), value, clocks, isoOf(s));
+      const record = finish(id ?? newId(), value, clocks, isoOf(s));
       data[c].set(record.id, record);
       emit();
       return record;
@@ -93,6 +111,7 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
     update(c, id, patch) {
       const existing = store.get(c, id);
       if (!existing) throw new Error("Record not found");
+      checkGuard(c);
       const { value, errors } = NORMALIZERS[c]({ ...existing, ...patch });
       if (errors.length) throw new ValidationError(errors);
       const s = clock.tick();
@@ -109,6 +128,7 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
     remove(c, id) {
       const existing = store.get(c, id);
       if (!existing) return;
+      checkGuard(c);
       const s = clock.tick();
       data[c].set(id, tombstone(id, s, existing.createdAt));
       if (c === "projects") {
@@ -125,6 +145,7 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
     getSettings() { return { ...settings }; },
 
     updateSettings(patch) {
+      checkGuard("settings");
       const next = normalizeSettings({ ...settings, ...patch }).value;
       const s = clock.tick();
       for (const k of Object.keys(next)) if (!same(next[k], settings[k]) || !settingsClocks[k]) settingsClocks[k] = s;
@@ -205,7 +226,10 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
      * every record is re-validated, unknown fields are ignored, and stamps
      * implausibly far in the future are rejected. Returns counts.
      */
-    merge(changes, { silent = false } = {}) {
+    merge(changes, { silent = false, acceptOrigin = () => true } = {}) {
+      // acceptOrigin(deviceId): false drops edits made by that device (for
+      // example a view-only member).
+      const fromAllowed = (s) => { const p = parseStamp(s); return Boolean(p) && acceptOrigin(p.device); };
       if (!changes || typeof changes !== "object") throw new Error("Sync data has the wrong shape");
       if (Number(changes.schemaVersion) > SCHEMA_VERSION) throw new Error("The other device runs a newer version. Update this app first.");
       let applied = 0;
@@ -217,7 +241,7 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
           const existing = data[c].get(row.id);
           const createdAt = existing?.createdAt ?? (typeof row.createdAt === "string" && !Number.isNaN(Date.parse(row.createdAt)) ? new Date(row.createdAt).toISOString() : isoOf(clock.tick()));
           if (row.deleted === true) {
-            if (!clock.acceptable(row._d)) { dropped++; continue; }
+            if (!clock.acceptable(row._d) || !fromAllowed(row._d)) { dropped++; continue; }
             clock.observe(row._d);
             if (!existing?.deleted || row._d > existing._d) { data[c].set(row.id, tombstone(row.id, row._d, createdAt)); applied++; }
             continue;
@@ -230,7 +254,7 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
           let rejected = false;
           for (const [k, s] of Object.entries(row._c)) {
             if (!Object.hasOwn(row, k) || k === "id" || k.startsWith("_")) continue;
-            if (!clock.acceptable(s)) { rejected = true; continue; }
+            if (!clock.acceptable(s) || !fromAllowed(s)) { rejected = true; continue; }
             clock.observe(s);
             if (!clocks[k] || s > clocks[k]) { candidate[k] = row[k]; clocks[k] = s; changed = true; }
           }
@@ -247,7 +271,7 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
         const cand = { ...settings };
         let changed = false;
         for (const [k, s] of Object.entries(changes.settings._c)) {
-          if (!Object.hasOwn(settings, k) || !clock.acceptable(s)) continue;
+          if (!Object.hasOwn(settings, k) || !clock.acceptable(s) || !fromAllowed(s)) continue;
           clock.observe(s);
           if (!settingsClocks[k] || s > settingsClocks[k]) { cand[k] = changes.settings[k]; settingsClocks[k] = s; changed = true; }
         }
@@ -263,6 +287,7 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
       return JSON.stringify({
         schemaVersion: SCHEMA_VERSION,
         settings: { ...settings, _c: settingsClocks },
+        local,
         ...Object.fromEntries(COLLECTIONS.map((c) => [c, [...data[c].values()]])),
       });
     },
@@ -302,6 +327,12 @@ export function createStore({ deviceId, now = () => new Date() } = {}) {
             clock.observe(s);
           }
           data[c].set(r.id, finish(r.id, value, clocks, createdAt));
+        }
+      }
+      local = { lastSync: {} };
+      if (doc.local && typeof doc.local.lastSync === "object" && doc.local.lastSync) {
+        for (const [k, v] of Object.entries(doc.local.lastSync)) {
+          if (ID_RE.test(k) && typeof v === "string" && !Number.isNaN(Date.parse(v))) local.lastSync[k] = new Date(v).toISOString();
         }
       }
       settings = normalizeSettings(doc.settings).value;

@@ -28,6 +28,8 @@ use std::path::{Path, PathBuf};
 pub const DATA_FILE: &str = "data.enc";
 pub const KEY_FILE: &str = "key.wrapped";
 pub const DEVICE_FILE: &str = "device-id";
+pub const IDENTITY_KEY_FILE: &str = "identity.key.wrapped";
+pub const IDENTITY_PUB_FILE: &str = "identity.pub";
 const LEGACY_DATA_FILE: &str = "data.json";
 const MAGIC: &[u8; 4] = b"WDE1";
 
@@ -140,6 +142,59 @@ impl Vault {
             }
         }
         Ok(())
+    }
+}
+
+/// This device's long-term sync identity (Noise static key pair). The
+/// private key is wrapped by the OS key protection, like the data key.
+pub struct Identity {
+    private: Vec<u8>,
+    pub public: Vec<u8>,
+}
+
+impl Identity {
+    pub fn private(&self) -> &[u8] {
+        &self.private
+    }
+}
+
+impl Drop for Identity {
+    fn drop(&mut self) {
+        for b in self.private.iter_mut() {
+            unsafe { std::ptr::write_volatile(b, 0) };
+        }
+    }
+}
+
+/// Loads the identity, or creates one with `generate` on first use. Never
+/// replaces an identity that exists but can't be unlocked: other devices
+/// know this device by its key.
+pub fn load_or_create_identity(
+    dir: &Path,
+    wrapper: &dyn KeyWrapper,
+    generate: impl FnOnce() -> io::Result<(Vec<u8>, Vec<u8>)>,
+) -> io::Result<Identity> {
+    fs::create_dir_all(dir)?;
+    let wrapped = read_limited(&dir.join(IDENTITY_KEY_FILE), 4096)?;
+    let public = read_limited(&dir.join(IDENTITY_PUB_FILE), 64)?;
+    match (wrapped, public) {
+        (Some(w), Some(p)) => {
+            let private = wrapper.unwrap(&w).map_err(|e| other(format!("couldn't unlock this device's sync key ({e})")))?;
+            if private.len() != 32 || p.len() != 32 {
+                return Err(other("this device's sync key is damaged"));
+            }
+            Ok(Identity { private, public: p })
+        }
+        (None, None) => {
+            let (private, public) = generate()?;
+            if private.len() != 32 || public.len() != 32 {
+                return Err(other("key generation failed"));
+            }
+            write_atomic(dir, IDENTITY_KEY_FILE, &wrapper.wrap(&private)?, false)?;
+            write_atomic(dir, IDENTITY_PUB_FILE, &public, false)?;
+            Ok(Identity { private, public })
+        }
+        _ => Err(other("this device's sync key is incomplete; it has not been replaced")),
     }
 }
 
@@ -383,6 +438,19 @@ mod tests {
         let dir = temp_dir("big");
         fs::write(dir.join(DEVICE_FILE), "x".repeat(100)).unwrap();
         assert!(load_device_id(&dir).is_err());
+    }
+
+    #[test]
+    fn identity_is_created_once_wrapped_and_never_replaced() {
+        let dir = temp_dir("identity");
+        let w = FakeWrapper::ok();
+        let id1 = load_or_create_identity(&dir, &w, || Ok((vec![1; 32], vec![2; 32]))).unwrap();
+        assert_eq!(id1.public, vec![2; 32]);
+        assert_ne!(fs::read(dir.join(IDENTITY_KEY_FILE)).unwrap(), vec![1u8; 32], "private key must be wrapped");
+        let id2 = load_or_create_identity(&dir, &w, || panic!("must not regenerate")).unwrap();
+        assert_eq!(id2.private(), &[1u8; 32][..]);
+        fs::remove_file(dir.join(IDENTITY_PUB_FILE)).unwrap();
+        assert!(load_or_create_identity(&dir, &w, || Ok((vec![3; 32], vec![4; 32]))).is_err());
     }
 
     #[test]

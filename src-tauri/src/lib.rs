@@ -6,16 +6,19 @@
 
 mod crypto;
 mod net;
+mod pipe;
 mod qr;
 mod storage;
 
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager, Runtime, State};
 
-use storage::Vault;
+use storage::{b64_encode, Identity, KeyWrapper, Vault};
 
 /// Opened on first use. An error is kept, so a vault that can't be unlocked
 /// stays closed and nothing is ever written over the existing data.
@@ -26,15 +29,26 @@ fn data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     app.path().app_data_dir().map_err(|e| e.to_string())
 }
 
+fn key_wrapper<R: Runtime>(app: &AppHandle<R>) -> Box<dyn KeyWrapper> {
+    #[cfg(windows)]
+    {
+        let _ = app;
+        Box::new(crypto::platform::Dpapi)
+    }
+    #[cfg(target_os = "android")]
+    {
+        Box::new(crypto::platform::AndroidKeystore(app.clone()))
+    }
+    #[cfg(not(any(windows, target_os = "android")))]
+    {
+        let _ = app;
+        Box::new(crypto::platform::DevOnly)
+    }
+}
+
 fn open_vault<R: Runtime>(app: &AppHandle<R>) -> Result<Vault, String> {
     let dir = data_dir(app)?;
-    #[cfg(windows)]
-    let wrapper = crypto::platform::Dpapi;
-    #[cfg(target_os = "android")]
-    let wrapper = crypto::platform::AndroidKeystore(app.clone());
-    #[cfg(not(any(windows, target_os = "android")))]
-    let wrapper = crypto::platform::DevOnly;
-    Vault::open(&dir, &wrapper, Box::new(crypto::XChaCha)).map_err(|e| e.to_string())
+    Vault::open(&dir, key_wrapper(app).as_ref(), Box::new(crypto::XChaCha)).map_err(|e| e.to_string())
 }
 
 fn with_vault<R: Runtime, T>(
@@ -166,11 +180,173 @@ async fn net_check_probe(host: String, port: u16, token: String) -> Result<Probe
         .map_err(|e| e.to_string())
 }
 
+// ---- Device sync pipe (phase 2) --------------------------------------------
+
+#[derive(Default)]
+struct IdentityState(Mutex<Option<Identity>>);
+
+#[derive(Default)]
+struct SyncNet {
+    listener: Mutex<Option<std::net::TcpListener>>,
+    pipe: Mutex<Option<pipe::Pipe>>,
+    cancel: AtomicBool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IdentityInfo {
+    public_key: String,
+    device_name: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ListenInfo {
+    ips: Vec<String>,
+    port: u16,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PeerInfo {
+    peer_key: String,
+    handshake_hash: String,
+}
+
+fn with_identity<R: Runtime, T>(app: &AppHandle<R>, state: &IdentityState, f: impl FnOnce(&Identity) -> T) -> Result<T, String> {
+    let mut slot = state.0.lock().map_err(|_| "busy".to_string())?;
+    if slot.is_none() {
+        let dir = data_dir(app)?;
+        let id = storage::load_or_create_identity(&dir, key_wrapper(app).as_ref(), pipe::generate_keypair).map_err(|e| e.to_string())?;
+        *slot = Some(id);
+    }
+    Ok(f(slot.as_ref().expect("identity loaded")))
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn peer_info(p: &pipe::Pipe) -> PeerInfo {
+    PeerInfo { peer_key: b64_encode(&p.peer_key), handshake_hash: hex(&p.handshake_hash) }
+}
+
+#[tauri::command]
+async fn identity_info<R: Runtime>(app: AppHandle<R>, state: State<'_, IdentityState>) -> Result<IdentityInfo, String> {
+    let public_key = with_identity(&app, &state, |id| b64_encode(&id.public))?;
+    Ok(IdentityInfo { public_key, device_name: device_name() })
+}
+
+#[tauri::command]
+async fn qr_svg(text: String) -> Result<String, String> {
+    if text.len() > 512 {
+        return Err("too long".into());
+    }
+    qr::svg_data_url(&text)
+}
+
+#[tauri::command]
+async fn pipe_listen(net: State<'_, Arc<SyncNet>>) -> Result<ListenInfo, String> {
+    let listener = std::net::TcpListener::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+    net.cancel.store(false, Ordering::Relaxed);
+    *net.pipe.lock().map_err(|_| "busy")? = None;
+    *net.listener.lock().map_err(|_| "busy")? = Some(listener);
+    let ips = net::local_ipv4s().into_iter().map(|ip| ip.to_string()).collect();
+    Ok(ListenInfo { ips, port })
+}
+
+#[tauri::command]
+async fn pipe_accept<R: Runtime>(
+    app: AppHandle<R>,
+    identity: State<'_, IdentityState>,
+    net: State<'_, Arc<SyncNet>>,
+    timeout_secs: u64,
+) -> Result<PeerInfo, String> {
+    let private = with_identity(&app, &identity, |id| id.private().to_vec())?;
+    let listener = net.listener.lock().map_err(|_| "busy")?.take().ok_or("not listening")?;
+    let shared = Arc::clone(net.inner());
+    let timeout = Duration::from_secs(timeout_secs.clamp(5, 600));
+    let pipe = tauri::async_runtime::spawn_blocking(move || pipe::accept_one(listener, &private, timeout, &shared.cancel))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::TimedOut => "timed-out".to_string(),
+            std::io::ErrorKind::Interrupted => "cancelled".to_string(),
+            _ => e.to_string(),
+        })?;
+    let info = peer_info(&pipe);
+    *net.pipe.lock().map_err(|_| "busy")? = Some(pipe);
+    Ok(info)
+}
+
+#[tauri::command]
+async fn pipe_connect<R: Runtime>(
+    app: AppHandle<R>,
+    identity: State<'_, IdentityState>,
+    net: State<'_, Arc<SyncNet>>,
+    ips: Vec<String>,
+    port: u16,
+) -> Result<PeerInfo, String> {
+    let private = with_identity(&app, &identity, |id| id.private().to_vec())?;
+    let pipe = tauri::async_runtime::spawn_blocking(move || pipe::Pipe::connect(&ips, port, &private))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock => "timed-out".to_string(),
+            std::io::ErrorKind::ConnectionRefused => "refused".to_string(),
+            _ => e.to_string(),
+        })?;
+    let info = peer_info(&pipe);
+    *net.pipe.lock().map_err(|_| "busy")? = Some(pipe);
+    Ok(info)
+}
+
+#[tauri::command]
+async fn pipe_send(net: State<'_, Arc<SyncNet>>, text: String) -> Result<(), String> {
+    let shared = Arc::clone(net.inner());
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut slot = shared.pipe.lock().map_err(|_| "busy".to_string())?;
+        let p = slot.as_mut().ok_or("not connected")?;
+        p.send(text.as_bytes()).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn pipe_recv(net: State<'_, Arc<SyncNet>>, timeout_secs: u64) -> Result<String, String> {
+    let shared = Arc::clone(net.inner());
+    let timeout = Duration::from_secs(timeout_secs.clamp(1, 300));
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut slot = shared.pipe.lock().map_err(|_| "busy".to_string())?;
+        let p = slot.as_mut().ok_or("not connected")?;
+        let bytes = p.recv(timeout).map_err(|e| match e.kind() {
+            std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock => "timed-out".to_string(),
+            std::io::ErrorKind::UnexpectedEof => "closed".to_string(),
+            _ => e.to_string(),
+        })?;
+        String::from_utf8(bytes).map_err(|_| "bad message".to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn pipe_close(net: State<'_, Arc<SyncNet>>) -> Result<(), String> {
+    net.cancel.store(true, Ordering::Relaxed);
+    *net.listener.lock().map_err(|_| "busy")? = None;
+    *net.pipe.lock().map_err(|_| "busy")? = None;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
         .manage(VaultState::default())
-        .manage(NetCheckState::default());
+        .manage(NetCheckState::default())
+        .manage(IdentityState::default())
+        .manage(Arc::new(SyncNet::default()));
     #[cfg(target_os = "android")]
     let builder = builder.plugin(crypto::platform::init());
     #[cfg(mobile)]
@@ -185,7 +361,15 @@ pub fn run() {
             net_check_start,
             net_check_status,
             net_check_stop,
-            net_check_probe
+            net_check_probe,
+            identity_info,
+            qr_svg,
+            pipe_listen,
+            pipe_accept,
+            pipe_connect,
+            pipe_send,
+            pipe_recv,
+            pipe_close
         ])
         .run(tauri::generate_context!())
         .expect("error while running Work Dashboard");
