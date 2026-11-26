@@ -52,13 +52,13 @@ async function boot() {
     }
   } catch (err) {
     // Never overwrite data we couldn't read.
-    setStatus(`Couldn't load saved data: ${err.message}. Changes won't be saved until this is fixed.`, true);
+    setStatus(`Couldn't load saved data: ${err?.message ?? err}. Your data has not been changed, and nothing will be saved until this is fixed.`, true);
     store.readOnlyBecauseLoadFailed = true;
   }
 
   const save = debounce(async () => {
     if (store.readOnlyBecauseLoadFailed) return;
-    try { await saveRaw(store.serialize()); setStatus(""); } catch (err) { setStatus(`Save failed: ${err}`, true); }
+    try { await saveRaw(store.serialize()); setStatus(""); } catch (err) { setStatus(`Save failed: ${err?.message ?? err}`, true); }
   }, 300);
 
   store.subscribe(() => { save(); theme(); render(); });

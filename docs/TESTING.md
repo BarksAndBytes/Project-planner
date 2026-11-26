@@ -6,6 +6,9 @@ Tick items off (or tell Claude what happened) as you go. Report anything odd wit
 
 ## Waiting for you
 
+### Fix check (Nov 26 evening)
+- [ ] Install the newest Android build over the current one: the "Couldn't load saved data" message is gone and your earlier projects are back
+
 ### Phase 1 basics on Windows
 - [ ] Windows installer runs (More info → Run anyway) and the app opens
 - [ ] Create a project, task and log entry; close the app fully; reopen: everything is still there (proves encryption at rest works with Windows Data Protection)

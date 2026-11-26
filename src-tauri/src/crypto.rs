@@ -153,17 +153,37 @@ pub mod platform {
         data: String,
     }
 
-    /// Registers the Kotlin `KeystorePlugin` and `SharePlugin` classes from
-    /// the app's Android project.
-    pub fn init<R: Runtime>() -> TauriPlugin<R> {
+    const PKG: &str = "io.github.barksandbytes.workdashboard";
+
+    // Each Kotlin class needs its own Tauri plugin: Android routes commands
+    // by plugin name, so registering several classes under one name makes
+    // the last one replace the others (which broke the Keystore in 0.2.0).
+
+    /// Android Keystore wrapper for the data and identity keys.
+    pub fn init_keystore<R: Runtime>() -> TauriPlugin<R> {
         Builder::new("keystore")
             .setup(|app, api| {
-                let handle = api.register_android_plugin("io.github.barksandbytes.workdashboard", "KeystorePlugin")?;
-                app.manage(Keystore(handle));
-                let share = api.register_android_plugin("io.github.barksandbytes.workdashboard", "SharePlugin")?;
-                app.manage(Share(share));
-                let speech = api.register_android_plugin("io.github.barksandbytes.workdashboard", "SpeechPlugin")?;
-                app.manage(Speech(speech));
+                app.manage(Keystore(api.register_android_plugin(PKG, "KeystorePlugin")?));
+                Ok(())
+            })
+            .build()
+    }
+
+    /// Share sheet for exported files.
+    pub fn init_share<R: Runtime>() -> TauriPlugin<R> {
+        Builder::new("wdshare")
+            .setup(|app, api| {
+                app.manage(Share(api.register_android_plugin(PKG, "SharePlugin")?));
+                Ok(())
+            })
+            .build()
+    }
+
+    /// Built-in speech recognizer for voice input.
+    pub fn init_speech<R: Runtime>() -> TauriPlugin<R> {
+        Builder::new("wdspeech")
+            .setup(|app, api| {
+                app.manage(Speech(api.register_android_plugin(PKG, "SpeechPlugin")?));
                 Ok(())
             })
             .build()

@@ -469,7 +469,10 @@ pub fn run() {
         .manage(IdentityState::default())
         .manage(Arc::new(SyncNet::default()));
     #[cfg(target_os = "android")]
-    let builder = builder.plugin(crypto::platform::init());
+    let builder = builder
+        .plugin(crypto::platform::init_keystore())
+        .plugin(crypto::platform::init_share())
+        .plugin(crypto::platform::init_speech());
     #[cfg(mobile)]
     let builder = builder.plugin(tauri_plugin_barcode_scanner::init());
     builder
