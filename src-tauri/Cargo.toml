@@ -23,6 +23,12 @@ tauri = { version = "2", features = [] }
 # Data encryption at rest: XChaCha20-Poly1305 from RustCrypto.
 chacha20poly1305 = "0.10"
 serde = { version = "1", features = ["derive"] }
+# QR codes for the network check and device pairing (SVG output only).
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+# Official Tauri plugin: scans QR codes with the phone camera.
+tauri-plugin-barcode-scanner = "2"
 
 [target.'cfg(windows)'.dependencies]
 # Windows Data Protection API, to protect the data key.

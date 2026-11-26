@@ -79,3 +79,14 @@ test("before-and-after wording matches the spec example", () => {
   const p = { metric: "setup time", unit: "min", baseline: 42, target: 25 };
   assert.equal(describeChange(p, 28), "Setup time 42 min to 28 min, down 33%, target 25 min");
 });
+
+import { parseCheckPayload } from "../src/js/netcheck.js";
+
+test("network check QR payloads are parsed strictly", () => {
+  const t = "0123456789abcdef0123456789abcdef";
+  assert.deepEqual(parseCheckPayload(`wdcheck:1:192.168.1.20:50123:${t}`), { host: "192.168.1.20", port: 50123, token: t });
+  for (const bad of [`wdcheck:1:192.168.1.300:50:${t}`, `wdcheck:1:192.168.1.2:70000:${t}`, `wdcheck:2:192.168.1.2:50:${t}`,
+    `wdcheck:1:evil.com:50:${t}`, "https://example.com", `wdcheck:1:10.0.0.1:50:${t}x`]) {
+    assert.equal(parseCheckPayload(bad), null, bad);
+  }
+});

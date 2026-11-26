@@ -159,3 +159,9 @@ dialog::backdrop { background: rgb(0 0 0 / .45); }
 .segmented { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .segmented button { min-height: var(--tap); padding: 0 1rem; border: 0; background: var(--surf); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
 .segmented button.on { background: var(--acc); color: var(--accink); }
+
+/* Network check */
+.qr { display: block; width: 240px; height: 240px; margin: .75rem auto; border-radius: 8px; image-rendering: pixelated; }
+.big.ok { color: var(--ok); }
+details.manual { margin-top: .75rem; }
+details.manual summary { min-height: var(--tap); display: flex; align-items: center; cursor: pointer; color: var(--acc); font-weight: 600; }

@@ -24,10 +24,12 @@ jobs:
           node-version: 22
       - name: JavaScript tests (model, store, themes contrast, static security scan)
         run: .github/scripts/run-logged.sh npm test
-      - name: Rust storage tests (std only)
+      - name: Rust storage and network tests (std only)
         run: |
-          rustc --edition 2021 --test src-tauri/src/storage.rs -o "$RUNNER_TEMP/storage_test"
-          "$RUNNER_TEMP/storage_test"
+          for m in storage net; do
+            rustc --edition 2021 --test "src-tauri/src/$m.rs" -o "$RUNNER_TEMP/${m}_test"
+            "$RUNNER_TEMP/${m}_test"
+          done
 
   windows:
     name: Windows installer

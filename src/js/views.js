@@ -396,10 +396,13 @@ export function settingsView(store, { version, native }) {
     h("div", { class: "card" }, h("h2", {}, "Automatic log entries"),
       toggle(store, "autoLogStage", "Log a success when a project reaches its next stage"),
       toggle(store, "autoLogTasks", "Log a success when a task is completed")),
+    h("div", { class: "card" }, h("h2", {}, "Sync"),
+      h("p", { class: "small muted" }, "Phone-to-computer sync is being built. First, check that your devices can reach each other on each network you use."),
+      h("a", { class: "btn", href: "#/netcheck" }, "Network check")),
     h("div", { class: "card" }, h("h2", {}, "About"),
       h("p", {}, `Work Dashboard ${version}`),
       h("p", { class: "small muted" }, native ? "Data is stored only on this device." : "Development mode: running in a browser, data kept in this browser only."),
-      h("p", { class: "small muted" }, "Sync, export, backup and voice arrive in later phases.")));
+      h("p", { class: "small muted" }, "Export, backup and voice arrive in later phases.")));
 }
 
 function toggle(store, key, label) {

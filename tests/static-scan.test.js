@@ -39,4 +39,7 @@ test("Tauri config keeps a strict CSP and no extra permissions", () => {
   assert.ok(!csp.includes("unsafe-inline") && !csp.includes("unsafe-eval"));
   const cap = JSON.parse(readFileSync(join(root, "src-tauri/capabilities/default.json"), "utf8"));
   assert.deepEqual(cap.permissions, ["core:default"]);
+  const mobile = JSON.parse(readFileSync(join(root, "src-tauri/capabilities/mobile.json"), "utf8"));
+  assert.deepEqual(mobile.platforms, ["android", "iOS"]);
+  assert.deepEqual(mobile.permissions, ["barcode-scanner:default"]);
 });

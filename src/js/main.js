@@ -5,8 +5,9 @@ import { createStore } from "./store.js";
 import { applyTheme } from "./themes.js";
 import { loadRaw, saveRaw, getDeviceId, isNative, debounce } from "./persist.js";
 import { dashboardView, projectsView, projectFormView, projectView, entryForm, settingsView } from "./views.js";
+import { netcheckView } from "./netcheck.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0-dev";
 const main = document.getElementById("main");
 const status = document.getElementById("status");
 const dialog = document.getElementById("sheet");
@@ -100,6 +101,7 @@ function render() {
         : projectView(store, { ...ctx, id: parts[1], tab: parts[2] });
       break;
     case "settings": view = settingsView(store, { version: VERSION, native: isNative() }); nav = "settings"; break;
+    case "netcheck": view = netcheckView({ isAndroid: /Android/i.test(navigator.userAgent) }); nav = "settings"; break;
     default: view = dashboardView(store, ctx);
   }
   const focused = document.activeElement?.closest?.("#main") ? document.activeElement.getAttribute("type") : null;
