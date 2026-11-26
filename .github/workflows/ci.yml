@@ -56,7 +56,7 @@ jobs:
           if-no-files-found: error
 
   android:
-    name: Android APK (debug-signed test build)
+    name: Android APK
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -78,9 +78,87 @@ jobs:
           echo "Using NDK at $NDK_HOME"
           .github/scripts/run-logged.sh npx tauri android init --ci
           .github/scripts/prepare-android.sh
-          .github/scripts/run-logged.sh npx tauri android build --apk --debug --ci
+          .github/scripts/run-logged.sh npx tauri android build --apk --ci
       - uses: actions/upload-artifact@v4
         with:
-          name: work-dashboard-android-debug
-          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          name: android-unsigned
+          path: src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
+
+  # Test builds are signed with the real release key, so a phone can move
+  # from test builds to Store/GitHub releases without uninstalling (which
+  # would delete that phone's data). Pushes only: pull requests never get
+  # secrets. This job runs no npm or cargo; it only runs apksigner.
+  sign-android:
+    name: Sign Android APK
+    if: github.event_name == 'push'
+    needs: android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-unsigned
+          path: apk
+      - name: Sign
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          EXPECTED_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 || '55:71:21:B2:6E:5E:FF:D7:FC:2F:93:F9:06:98:70:63:CA:59:CF:D6:6D:DC:51:41:B2:16:1A:2F:26:0C:03:6A' }}
+        run: |
+          find apk -mindepth 2 -name '*-unsigned.apk' -exec mv {} apk/ \;
+          .github/scripts/sign-apk.sh apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: work-dashboard-android
+          path: apk/*-signed.apk
+          if-no-files-found: error
+
+  # Rolling pre-release with the newest test build, at fixed download links:
+  #   .../releases/download/test-build/WorkDashboard-test.apk
+  #   .../releases/download/test-build/WorkDashboard-test-x64.msi
+  # Marked pre-release, so it never shows as the "Latest" release.
+  test-build-release:
+    name: Publish test build
+    if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+    needs: [windows, sign-android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: test-build-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+      - name: Collect files
+        run: |
+          mkdir dist
+          cp out/work-dashboard-android/*-signed.apk dist/WorkDashboard-test.apk
+          cp out/work-dashboard-windows-unsigned/*.msi dist/WorkDashboard-test-x64.msi
+          (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+      - name: Replace the test-build pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          short="${GITHUB_SHA:0:7}"
+          msg="$(printf '%s' "$COMMIT_MSG" | head -1)"
+          notes=$(cat <<EOF
+          Newest test build from \`$BRANCH\` at commit $short: $msg
+
+          - **Android:** \`WorkDashboard-test.apk\`, signed with the release key. Installs over earlier test builds and keeps your data.
+          - **Windows:** \`WorkDashboard-test-x64.msi\`, unsigned. Windows warns: More info, then Run anyway.
+
+          Built $(date -u '+%Y-%m-%d %H:%M UTC'). Replaced on every push. For testing only.
+          EOF
+          )
+          gh release delete test-build -R "$REPO" --cleanup-tag -y 2>/dev/null || true
+          gh release create test-build -R "$REPO" --prerelease --target "$GITHUB_SHA" \
+            --title "Test build ($BRANCH @ $short)" --notes "$notes" dist/*

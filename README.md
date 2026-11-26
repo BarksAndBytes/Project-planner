@@ -19,7 +19,10 @@ The full design is in the application spec (kept as a Claude doc; section number
 
 ## Try it
 
-**From CI:** every push builds an unsigned Windows `.msi` and a debug-signed Android `.apk`. Download them from the run's Artifacts on the Actions tab. These are test builds; Windows will show a SmartScreen warning.
+**Newest test build:** every push publishes a rolling pre-release called [Test build](https://github.com/BarksAndBytes/Project-planner/releases/tag/test-build), with fixed download links:
+
+- Android: [WorkDashboard-test.apk](https://github.com/BarksAndBytes/Project-planner/releases/download/test-build/WorkDashboard-test.apk) (signed with the release key, installs over earlier builds and keeps data)
+- Windows: [WorkDashboard-test-x64.msi](https://github.com/BarksAndBytes/Project-planner/releases/download/test-build/WorkDashboard-test-x64.msi) (unsigned: More info, then Run anyway)
 
 **In a browser (screens only, data stays in that browser):**
 
