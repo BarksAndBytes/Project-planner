@@ -7,7 +7,7 @@ log="$(mktemp)"
 "$@" 2>&1 | tee "$log"
 status=${PIPESTATUS[0]}
 if [ "$status" -ne 0 ]; then
-  msg="$(grep -E 'error(\[|:)|warning: unused|^\s+-->|FAILURE|What went wrong|Exception|cannot find|unresolved|expected' "$log" | head -60)"
+  msg="$(grep -E -A8 'error(\[|:)|^\s+-->|What went wrong|cannot find|unresolved' "$log" | head -80)"
   [ -z "$msg" ] && msg="$(tail -60 "$log")"
   msg="${msg//'%'/'%25'}"; msg="${msg//$'\r'/'%0D'}"; msg="${msg//$'\n'/'%0A'}"
   echo "::error title=$1 failed::${msg:0:60000}"
