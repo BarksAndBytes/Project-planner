@@ -73,9 +73,9 @@ jobs:
           targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
       - run: npm install
       - name: Build
-        env:
-          NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
         run: |
+          export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          echo "Using NDK at $NDK_HOME"
           .github/scripts/run-logged.sh npx tauri android init --ci
           .github/scripts/prepare-android.sh
           .github/scripts/run-logged.sh npx tauri android build --apk --debug --ci

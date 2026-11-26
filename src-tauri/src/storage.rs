@@ -7,12 +7,11 @@
 //! `crypto.rs` and plug in through the [`Sealer`] and [`KeyWrapper`] traits.
 //!
 //! Files in the app's private data folder:
-//! - `data.enc`      the data document, sealed with a random 256-bit data key
-//! - `data.enc.bak`  the previous version
-//! - `key.wrapped`   the data key, wrapped by Windows Data Protection or the
-//!                   Android Keystore, so it is useless on any other device
-//!                   or user account
-//! - `device-id`     this device's id (not secret)
+//! - `data.enc`: the data document, sealed with a random 256-bit data key.
+//! - `data.enc.bak`: the previous version.
+//! - `key.wrapped`: the data key, wrapped by Windows Data Protection or the
+//!   Android Keystore, so it is useless on any other device or user account.
+//! - `device-id`: this device's id (not secret).
 //!
 //! Rules:
 //! - Writes are atomic (temp file, flush, rename), so a crash mid-save never
@@ -207,8 +206,10 @@ fn write_atomic(dir: &Path, name: &str, bytes: &[u8], keep_backup: bool) -> io::
 
 // ---- Base64 (for passing bytes to the Android Keystore plugin) ------------
 
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
 const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub fn b64_encode(data: &[u8]) -> String {
     let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
@@ -224,6 +225,7 @@ pub fn b64_encode(data: &[u8]) -> String {
     out
 }
 
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub fn b64_decode(s: &str) -> io::Result<Vec<u8>> {
     let s = s.trim_end_matches('=');
     let mut out = Vec::with_capacity(s.len() * 3 / 4);
