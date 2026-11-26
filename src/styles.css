@@ -198,3 +198,7 @@ ol.steps li { margin-bottom: .35rem; }
   main { padding: 0; max-width: none; }
   .doc-preview { border: 0; padding: 0; }
 }
+
+/* Voice */
+.label-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.btn.mic { min-height: 40px; padding: 0 .9rem; }

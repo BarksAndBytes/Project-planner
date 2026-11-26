@@ -7,6 +7,7 @@ import {
 } from "./model.js";
 import { dashboardStats, ValidationError } from "./store.js";
 import { PALETTES, TYPE_TOKEN } from "./themes.js";
+import { detectType, listen, voiceAvailable, VOICE_HELP } from "./voice.js";
 
 // ---- Shared bits ---------------------------------------------------------
 
@@ -345,14 +346,40 @@ export function entryForm(store, { projectId, entryId, onDone, confirm }) {
   typeSel.addEventListener("change", () => renderExtras(typeSel.value));
   renderExtras(e.type);
 
+  const textArea = h("textarea", { name: "text", rows: 4, maxlength: LIMITS.logText, required: true, autofocus: true }, e.text ?? "");
+  const source = h("input", { type: "hidden", name: "source", value: e.source ?? "typed" });
+  const voiceMsg = h("small", { class: "hint" }, voiceAvailable()
+    ? "Tap the mic and speak. Start with \"Win\", \"Problem\", \"Blocked\", \"Decision\" or \"Note\" to set the type."
+    : "Your keyboard's mic also works.");
+  const mic = voiceAvailable() ? h("button", { class: "btn mic", type: "button", "aria-label": "Speak", onclick: async () => {
+    try {
+      const spoken = await listen(textArea);
+      source.value = "voice";
+      if (spoken === null) { voiceMsg.textContent = "Windows voice typing is open: speak, then edit and Save."; return; }
+      const d = detectType(spoken);
+      if (d.type) { typeSel.value = d.type; renderExtras(d.type); }
+      textArea.value = textArea.value.trim() ? `${textArea.value.trim()} ${d.text}` : d.text;
+      textArea.focus();
+    } catch (err) {
+      const msg = VOICE_HELP[String(err)];
+      if (msg !== null) voiceMsg.textContent = msg ?? `Voice input problem: ${err}`;
+    }
+  } }, "🎤 Speak") : null;
+  textArea.addEventListener("blur", () => {
+    // Keyword typed or spoken via the keyboard mic also sets the type.
+    const d = detectType(textArea.value);
+    if (d.type && !existing) { typeSel.value = d.type; renderExtras(d.type); textArea.value = d.text; }
+  });
+
   const form = h("form", { class: "form", novalidate: true },
     h("h2", {}, existing ? "Edit entry" : "Quick log"),
     errors,
     h("div", { class: "row3" },
       field("Project", select("projectId", projects.map((p) => [p.id, p.name]), e.projectId ?? projects[0].id)),
       field("Type", typeSel)),
-    field("What happened?", h("textarea", { name: "text", rows: 4, maxlength: LIMITS.logText, required: true, autofocus: true }, e.text ?? ""),
-      "Voice input arrives in phase 4. Your phone keyboard's mic works now."),
+    h("div", { class: "field" },
+      h("div", { class: "label-row" }, h("span", { class: "field-label" }, "What happened?"), mic),
+      textArea, voiceMsg, source),
     h("div", { class: "row3" },
       field("Date", h("input", { name: "date", type: "date", value: e.date })),
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "starred", checked: e.starred }), " Highlight for reviews")),

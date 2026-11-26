@@ -39,6 +39,13 @@ Tick items off (or tell Claude what happened) as you go. Report anything odd wit
 - [ ] Windows: Print / PDF prints only the summary, black on white
 - [ ] "Since my last review" uses the date set in Settings (once that setting has a screen; for now it falls back to Jan 1)
 
+### Voice input (Quick log → 🎤 Speak)
+- [ ] Android: Speak opens the phone's speech prompt; the words land in the box
+- [ ] Android: works with Wi-Fi and mobile data off once offline speech is set up (Settings → Google → Voice → Offline speech, download English)
+- [ ] Saying "Win: …", "Problem: …", "Blocked: …" sets Success / Failure / Blocker and drops the keyword
+- [ ] Windows: Speak opens Windows voice typing in the box; speaking types the text
+- [ ] Typing "Win: ..." by hand also sets the type when you leave the box
+
 ## Done
 - [x] Android: install, basic screens, status bar spacing, Quick log (Nov 26)
 - [x] Android: network check on home Wi-Fi (Nov 26)

@@ -34,8 +34,8 @@ qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 tauri-plugin-barcode-scanner = "2"
 
 [target.'cfg(windows)'.dependencies]
-# Windows Data Protection API, to protect the data key.
-windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+# Windows Data Protection API (data key) and SendInput (opens Windows voice typing).
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_UI_Input_KeyboardAndMouse"] }
 
 [profile.release]
 codegen-units = 1

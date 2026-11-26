@@ -113,6 +113,18 @@ pub mod platform {
 
     pub struct Keystore<R: Runtime>(PluginHandle<R>);
     pub struct Share<R: Runtime>(PluginHandle<R>);
+    pub struct Speech<R: Runtime>(PluginHandle<R>);
+
+    #[derive(Deserialize)]
+    struct SpeechResponse {
+        text: String,
+    }
+
+    /// Opens the phone's speech recognizer and waits for the text.
+    pub fn listen<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<String, String> {
+        let speech = app.state::<Speech<R>>();
+        speech.0.run_mobile_plugin::<SpeechResponse>("listen", ()).map(|r| r.text).map_err(|e| e.to_string())
+    }
 
     #[derive(Serialize)]
     struct ShareRequest {
@@ -150,6 +162,8 @@ pub mod platform {
                 app.manage(Keystore(handle));
                 let share = api.register_android_plugin("io.github.barksandbytes.workdashboard", "SharePlugin")?;
                 app.manage(Share(share));
+                let speech = api.register_android_plugin("io.github.barksandbytes.workdashboard", "SpeechPlugin")?;
+                app.manage(Speech(speech));
                 Ok(())
             })
             .build()

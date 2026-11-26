@@ -90,3 +90,13 @@ test("network check QR payloads are parsed strictly", () => {
     assert.equal(parseCheckPayload(bad), null, bad);
   }
 });
+
+import { detectType } from "../src/js/voice.js";
+
+test("spoken keywords set the entry type", () => {
+  assert.deepEqual(detectType("Win: cut setup time on the 4410"), { type: "success", text: "Cut setup time on the 4410" });
+  assert.deepEqual(detectType("problem, gripper dropped parts"), { type: "failure", text: "Gripper dropped parts" });
+  assert.deepEqual(detectType("Blocked waiting on fixture plate"), { type: "blocker", text: "Waiting on fixture plate" });
+  assert.deepEqual(detectType("Winding machine is down"), { type: null, text: "Winding machine is down" });
+  assert.equal(detectType("Note - call vendor").type, "note");
+});

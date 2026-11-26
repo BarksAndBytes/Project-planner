@@ -7,7 +7,7 @@ manifest="$gen/app/src/main/AndroidManifest.xml"
 
 # 1. Kotlin plugins: Android Keystore for the data key; share sheet for exports.
 mkdir -p "$pkg_dir"
-cp src-tauri/android/KeystorePlugin.kt src-tauri/android/SharePlugin.kt "$pkg_dir/"
+cp src-tauri/android/KeystorePlugin.kt src-tauri/android/SharePlugin.kt src-tauri/android/SpeechPlugin.kt "$pkg_dir/"
 
 # 2. No Android cloud backup or device-to-device copy of app data: data
 #    stays only on this device (spec 6.1). allowBackup covers cloud backup;
@@ -25,4 +25,10 @@ if ! grep -q 'ExportFileProvider' "$manifest"; then
   awk -v p="$provider" '/<\/application>/ && !done { print p; done=1 } { print }' "$manifest" > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
 fi
 grep -q 'ExportFileProvider' "$manifest" || { echo "::error::could not add the export file provider"; exit 1; }
+# 4. Let the app find the phone's speech recognizer (Android 11+ package visibility).
+if ! grep -q 'android.speech.action.RECOGNIZE_SPEECH' "$manifest"; then
+  q='    <queries><intent><action android:name="android.speech.action.RECOGNIZE_SPEECH" /></intent></queries>'
+  awk -v q="$q" '/<application/ && !done { print q; done=1 } { print }' "$manifest" > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
+fi
+grep -q 'RECOGNIZE_SPEECH' "$manifest" || { echo "::error::could not add speech queries"; exit 1; }
 echo "Android project prepared."

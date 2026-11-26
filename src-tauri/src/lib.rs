@@ -398,6 +398,48 @@ async fn reveal_export<R: Runtime>(app: AppHandle<R>, path: String) -> Result<()
     }
 }
 
+// ---- Voice input (phase 4) -----------------------------------------------------
+
+/// Android: opens the built-in speech recognizer and returns the text.
+/// Windows: opens Windows voice typing (the same as Windows key + H) for the
+/// text box that has focus, and returns "typing".
+#[tauri::command]
+async fn voice_listen<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    {
+        tauri::async_runtime::spawn_blocking(move || crypto::platform::listen(&app)).await.map_err(|e| e.to_string())?
+    }
+    #[cfg(windows)]
+    {
+        let _ = app;
+        windows_voice_typing()?;
+        Ok("typing".into())
+    }
+    #[cfg(not(any(windows, target_os = "android")))]
+    {
+        let _ = app;
+        Err("no-recognizer".into())
+    }
+}
+
+#[cfg(windows)]
+fn windows_voice_typing() -> Result<(), String> {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VK_LWIN,
+    };
+    const VK_H: u16 = 0x48;
+    let key = |vk: u16, up: bool| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT { wVk: vk, wScan: 0, dwFlags: if up { KEYEVENTF_KEYUP } else { 0 }, time: 0, dwExtraInfo: 0 },
+        },
+    };
+    let inputs = [key(VK_LWIN, false), key(VK_H, false), key(VK_H, true), key(VK_LWIN, true)];
+    // SAFETY: a valid array of keyboard INPUT structs and its exact size.
+    let sent = unsafe { SendInput(inputs.len() as u32, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32) };
+    if sent as usize == inputs.len() { Ok(()) } else { Err("couldn't open Windows voice typing".into()) }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -429,7 +471,8 @@ pub fn run() {
             pipe_recv,
             pipe_close,
             save_export,
-            reveal_export
+            reveal_export,
+            voice_listen
         ])
         .run(tauri::generate_context!())
         .expect("error while running Work Dashboard");
