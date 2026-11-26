@@ -1,6 +1,6 @@
 // Screens (spec section 4). Each view returns a DOM node; main.js routes.
 
-import { h, field, select, formData, formatDate } from "./dom.js";
+import { h, fill, field, select, formData, formatDate } from "./dom.js";
 import {
   PROJECT_TYPES, STATUSES, PRIORITIES, LOG_TYPES, LOG_TYPE_LABELS, IMPACTS, LIMITS,
   todayISO, describeChange,
@@ -19,7 +19,7 @@ function errorBox() {
 }
 
 function showErrors(box, err) {
-  box.replaceChildren(...(err instanceof ValidationError ? err.errors : [err.message]).map((e) => h("div", {}, e)));
+  fill(box, ...(err instanceof ValidationError ? err.errors : [err.message]).map((e) => h("div", {}, e)));
   box.hidden = false;
 }
 
@@ -123,7 +123,7 @@ export function projectFormView(store, { id, navigate }) {
   const typeFields = h("div", { class: "type-fields" });
 
   const renderTypeFields = (type) => {
-    typeFields.replaceChildren(...PROJECT_TYPES[type].fields.map((f) => {
+    fill(typeFields, ...PROJECT_TYPES[type].fields.map((f) => {
       const v = p[f.key];
       if (f.options) return field(f.label, select(f.key, f.options, v));
       return field(f.label, h("input", {
@@ -294,7 +294,7 @@ function logPanel(store, p, openQuickLog) {
   const wrap = h("div", { class: "card" });
   filter.addEventListener("change", () => { state.type = filter.value; wrap.replaceWith(logPanel(store, p, openQuickLog)); });
 
-  wrap.append(
+  fill(wrap,
     h("div", { class: "toolbar" }, filter, h("button", { class: "btn primary", onclick: () => openQuickLog(p.id) }, "Add entry")),
     entries.length ? h("ol", { class: "timeline" }, entries.map((e) => h("li", { class: `t-${e.type}` },
       h("div", { class: "t-head" }, typeTag(e.type),
@@ -325,7 +325,7 @@ export function entryForm(store, { projectId, entryId, onDone, confirm }) {
 
   const extras = h("div", {});
   const renderExtras = (type) => {
-    extras.replaceChildren(
+    fill(extras, 
       type === "success" ? h("fieldset", { class: "impact" }, h("legend", {}, "What did this improve?"),
         h("div", { class: "chips" }, IMPACTS.map((i) => h("label", { class: "chip-check" },
           h("input", { type: "checkbox", name: `impact-${i}`, value: i, dataset: { group: "impact" }, checked: e.impact?.includes(i) }), i))),

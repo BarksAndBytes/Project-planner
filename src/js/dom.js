@@ -32,6 +32,14 @@ function safeHref(v) {
   return s.startsWith("#") ? s : "#";
 }
 
+// Replaces an element's children, skipping null/false entries. (The DOM's
+// own replaceChildren() would show them as the text "null".)
+export function fill(el, ...children) {
+  clear(el);
+  append(el, children);
+  return el;
+}
+
 export function clear(el) {
   while (el.firstChild) el.firstChild.remove();
 }

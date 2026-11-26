@@ -15,6 +15,13 @@ test("no HTML injection sinks or dynamic code in the screens", () => {
   }
 });
 
+test("screens use fill() instead of raw replaceChildren/append (null would render as text)", () => {
+  for (const [name, src] of files) {
+    if (name === "dom.js") continue;
+    assert.ok(!/\.replaceChildren\(/.test(src), `${name} uses replaceChildren; use fill() from dom.js`);
+  }
+});
+
 test("the screens make no network requests", () => {
   const banned = [/\bfetch\s*\(/, /XMLHttpRequest/, /WebSocket/, /EventSource/, /navigator\.sendBeacon/, /https?:\/\//];
   for (const [name, src] of files) {
