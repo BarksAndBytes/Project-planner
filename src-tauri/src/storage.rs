@@ -278,7 +278,6 @@ pub fn b64_encode(data: &[u8]) -> String {
     out
 }
 
-#[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub fn b64_decode(s: &str) -> io::Result<Vec<u8>> {
     let s = s.trim_end_matches('=');
     let mut out = Vec::with_capacity(s.len() * 3 / 4);

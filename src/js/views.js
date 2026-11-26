@@ -100,6 +100,7 @@ export function projectsView(store, state) {
     h("div", { class: "toolbar" },
       search, statusSel, typeSel,
       h("label", { class: "check" }, arch, " Archived"),
+      h("a", { class: "btn", href: "#/export" }, "Work summary"),
       h("a", { class: "btn primary", href: "#/new" }, "New project")),
     projects.length ? h("ul", { class: "cards" }, projects.map((p) => {
       const pr = progress(store, p.id);
@@ -188,6 +189,7 @@ export function projectView(store, { id, tab = "overview", navigate, openQuickLo
       h("div", { class: "muted small" }, PROJECT_TYPES[p.type].label, " · ", p.status, " · ", p.priority, " priority",
         p.archived ? " · Archived" : "")),
     h("div", { class: "actions" },
+      h("a", { class: "btn", href: `#/export/${p.id}` }, "Summary"),
       h("a", { class: "btn", href: `#/project/${p.id}/edit` }, "Edit"),
       h("button", { class: "btn", onclick: () => store.update("projects", p.id, { archived: !p.archived }) }, p.archived ? "Unarchive" : "Archive"),
       h("button", { class: "btn danger", onclick: async () => {

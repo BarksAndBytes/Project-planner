@@ -23,9 +23,12 @@ test("screens use fill() instead of raw replaceChildren/append (null would rende
 });
 
 test("the screens make no network requests", () => {
+  // XML namespace identifiers in the Word writer look like URLs but are never fetched.
+  const NAMESPACES = /https?:\/\/(schemas\.openxmlformats\.org|purl\.org|www\.w3\.org)\//g;
   const banned = [/\bfetch\s*\(/, /XMLHttpRequest/, /WebSocket/, /EventSource/, /navigator\.sendBeacon/, /https?:\/\//];
   for (const [name, src] of files) {
-    for (const re of banned) assert.ok(!re.test(src), `${name} uses ${re}`);
+    const code = src.replace(NAMESPACES, "");
+    for (const re of banned) assert.ok(!re.test(code), `${name} uses ${re}`);
   }
   const html = readFileSync(join(root, "src/index.html"), "utf8") + readFileSync(join(root, "src/styles.css"), "utf8");
   assert.ok(!/(src|href)=["']https?:/.test(html) && !/url\(\s*["']?https?:/.test(html), "external resource in HTML/CSS");

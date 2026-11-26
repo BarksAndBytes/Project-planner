@@ -5,9 +5,9 @@ gen=src-tauri/gen/android
 pkg_dir="$gen/app/src/main/java/io/github/barksandbytes/workdashboard"
 manifest="$gen/app/src/main/AndroidManifest.xml"
 
-# 1. Android Keystore plugin for the data key.
+# 1. Kotlin plugins: Android Keystore for the data key; share sheet for exports.
 mkdir -p "$pkg_dir"
-cp src-tauri/android/KeystorePlugin.kt "$pkg_dir/"
+cp src-tauri/android/KeystorePlugin.kt src-tauri/android/SharePlugin.kt "$pkg_dir/"
 
 # 2. No Android cloud backup or device-to-device copy of app data: data
 #    stays only on this device (spec 6.1). allowBackup covers cloud backup;
@@ -18,4 +18,11 @@ sed -i -E 's/[[:space:]]android:(allowBackup|fullBackupContent|dataExtractionRul
 sed -i '0,/<application/s//<application android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml\/data_extraction_rules"/' "$manifest"
 grep -q 'android:allowBackup="false"' "$manifest" || { echo "::error::could not disable backup in AndroidManifest.xml"; exit 1; }
 grep -q 'android:dataExtractionRules=' "$manifest" || { echo "::error::could not set dataExtractionRules"; exit 1; }
+# 3. File provider for sharing exported files (only cache/exports).
+cp src-tauri/android/wd_export_paths.xml "$gen/app/src/main/res/xml/"
+if ! grep -q 'ExportFileProvider' "$manifest"; then
+  provider='        <provider android:name="io.github.barksandbytes.workdashboard.ExportFileProvider" android:authorities="${applicationId}.exports" android:exported="false" android:grantUriPermissions="true"><meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/wd_export_paths" /></provider>'
+  awk -v p="$provider" '/<\/application>/ && !done { print p; done=1 } { print }' "$manifest" > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
+fi
+grep -q 'ExportFileProvider' "$manifest" || { echo "::error::could not add the export file provider"; exit 1; }
 echo "Android project prepared."

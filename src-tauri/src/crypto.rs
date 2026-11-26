@@ -112,6 +112,24 @@ pub mod platform {
     use crate::storage::{b64_decode, b64_encode, KeyWrapper};
 
     pub struct Keystore<R: Runtime>(PluginHandle<R>);
+    pub struct Share<R: Runtime>(PluginHandle<R>);
+
+    #[derive(Serialize)]
+    struct ShareRequest {
+        path: String,
+        mime: String,
+        title: String,
+    }
+
+    /// Opens Android's share sheet for a file in cache/exports.
+    pub fn share_file<R: Runtime>(app: &tauri::AppHandle<R>, path: &str, mime: &str, title: &str) -> Result<(), String> {
+        let share = app.state::<Share<R>>();
+        share
+            .0
+            .run_mobile_plugin::<serde_json::Value>("share", ShareRequest { path: path.into(), mime: mime.into(), title: title.into() })
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
 
     #[derive(Serialize)]
     struct Request {
@@ -123,12 +141,15 @@ pub mod platform {
         data: String,
     }
 
-    /// Registers the Kotlin `KeystorePlugin` class from the app's Android project.
+    /// Registers the Kotlin `KeystorePlugin` and `SharePlugin` classes from
+    /// the app's Android project.
     pub fn init<R: Runtime>() -> TauriPlugin<R> {
         Builder::new("keystore")
             .setup(|app, api| {
                 let handle = api.register_android_plugin("io.github.barksandbytes.workdashboard", "KeystorePlugin")?;
                 app.manage(Keystore(handle));
+                let share = api.register_android_plugin("io.github.barksandbytes.workdashboard", "SharePlugin")?;
+                app.manage(Share(share));
                 Ok(())
             })
             .build()

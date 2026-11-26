@@ -5,6 +5,7 @@
 //! call needs the main thread free).
 
 mod crypto;
+mod exports;
 mod net;
 mod pipe;
 mod qr;
@@ -18,7 +19,7 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, Runtime, State};
 
-use storage::{b64_encode, Identity, KeyWrapper, Vault};
+use storage::{b64_decode, b64_encode, Identity, KeyWrapper, Vault};
 
 /// Opened on first use. An error is kept, so a vault that can't be unlocked
 /// stays closed and nothing is ever written over the existing data.
@@ -340,6 +341,63 @@ async fn pipe_close(net: State<'_, Arc<SyncNet>>) -> Result<(), String> {
     Ok(())
 }
 
+// ---- Exports (phase 3) ---------------------------------------------------------
+
+/// Saves an exported file. Windows: into Downloads, returns the full path.
+/// Android: opens the share sheet, returns "shared".
+#[tauri::command]
+async fn save_export<R: Runtime>(app: AppHandle<R>, name: String, data: String, mime: String) -> Result<String, String> {
+    let bytes = b64_decode(&data).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "android")]
+    {
+        let dir = app.path().app_cache_dir().map_err(|e| e.to_string())?.join("exports");
+        // Old exports are removed so the cache doesn't grow.
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for e in entries.flatten() {
+                let _ = std::fs::remove_file(e.path());
+            }
+        }
+        let path = exports::write_export(&dir, &name, &bytes).map_err(|e| e.to_string())?;
+        let path_str = path.to_string_lossy().to_string();
+        let title = if mime.contains("wordprocessingml") { "Share Word summary" } else { "Share file" };
+        crypto::platform::share_file(&app, &path_str, &mime, title)?;
+        Ok("shared".into())
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = &mime;
+        let dir = app.path().download_dir().map_err(|e| e.to_string())?;
+        let path = exports::write_export(&dir, &name, &bytes).map_err(|e| e.to_string())?;
+        Ok(path.to_string_lossy().to_string())
+    }
+}
+
+/// Windows: shows a saved export in File Explorer. Only files in Downloads.
+#[tauri::command]
+async fn reveal_export<R: Runtime>(app: AppHandle<R>, path: String) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let downloads = app.path().download_dir().map_err(|e| e.to_string())?;
+        let p = PathBuf::from(&path);
+        if p.parent() != Some(downloads.as_path()) || !p.is_file() {
+            return Err("not an export".into());
+        }
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        std::process::Command::new("explorer")
+            .arg(format!("/select,{}", p.display()))
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, path);
+        Err("not supported on this device".into())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -369,7 +427,9 @@ pub fn run() {
             pipe_connect,
             pipe_send,
             pipe_recv,
-            pipe_close
+            pipe_close,
+            save_export,
+            reveal_export
         ])
         .run(tauri::generate_context!())
         .expect("error while running Work Dashboard");

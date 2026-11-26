@@ -30,6 +30,15 @@ Tick items off (or tell Claude what happened) as you go. Report anything odd wit
 - [ ] Second computer (if you have one): it shows "Join an existing group", a member phone scans it, it receives everything
 - [ ] Close the app and reopen on both: still in the group and still syncing (identity keys survive restarts)
 
+### Work summary export (Projects → Work summary, or a project's Summary button)
+- [ ] Preview looks right for "This quarter" with a few real entries; wording changes read well, and "undo wording" restores your words
+- [ ] Windows: Word (.docx) saves to Downloads; "Show in folder" opens Explorer on it; it opens cleanly in Word
+- [ ] Android: Word (.docx) opens the share sheet; sending to Word / Drive / email works and the file opens
+- [ ] Copy as text, then paste into an email or Teams: layout is readable
+- [ ] CSV opens in Excel with one row per log entry
+- [ ] Windows: Print / PDF prints only the summary, black on white
+- [ ] "Since my last review" uses the date set in Settings (once that setting has a screen; for now it falls back to Jan 1)
+
 ## Done
 - [x] Android: install, basic screens, status bar spacing, Quick log (Nov 26)
 - [x] Android: network check on home Wi-Fi (Nov 26)

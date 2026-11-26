@@ -13,6 +13,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 /* Android draws the app under the status bar and gesture bar; keep content
    clear of them (and of display cutouts). */
@@ -176,3 +177,24 @@ details.manual summary { min-height: var(--tap); display: flex; align-items: cen
 h2.spaced { margin-top: 1.25rem; }
 ol.steps { padding-left: 1.25rem; }
 ol.steps li { margin-bottom: .35rem; }
+
+/* Export: preview always black on white, like the exported document. */
+.doc-preview { background: #fff; color: #000; border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem 1.5rem; font-size: .95rem; }
+.doc-preview h2 { font-size: 1.35rem; margin: 0; }
+.doc-preview h3 { font-size: 1rem; margin: 1.1rem 0 .4rem; padding-bottom: .2rem; border-bottom: 1px solid #999; }
+.doc-preview h4 { font-size: .9rem; margin: .6rem 0 .2rem; }
+.doc-preview ul { margin: .2rem 0; padding-left: 1.2rem; }
+.doc-preview li { margin: .15rem 0; }
+.doc-preview .muted { color: #555; }
+.doc-preview .totals { font-weight: 700; }
+.doc-preview table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.doc-preview th, .doc-preview td { border: 1px solid #999; padding: .25rem .4rem; text-align: left; vertical-align: top; }
+.doc-preview .link { color: #0E5E7E; min-height: 0; min-width: 0; margin-left: .35rem; }
+.chips-row { display: flex; flex-wrap: wrap; gap: 0 1rem; }
+.export-actions { margin-top: .5rem; }
+@media print {
+  .sidebar, .no-print, .status, .doc-preview .link { display: none !important; }
+  body { background: #fff; padding: 0; }
+  main { padding: 0; max-width: none; }
+  .doc-preview { border: 0; padding: 0; }
+}

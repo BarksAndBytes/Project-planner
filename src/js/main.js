@@ -7,6 +7,7 @@ import { loadRaw, saveRaw, getDeviceId, isNative, debounce } from "./persist.js"
 import { dashboardView, projectsView, projectFormView, projectView, entryForm, settingsView } from "./views.js";
 import { netcheckView } from "./netcheck.js";
 import { syncView, syncSummary } from "./syncui.js";
+import { exportView } from "./export.js";
 
 const VERSION = "0.2.0-dev";
 const main = document.getElementById("main");
@@ -117,6 +118,7 @@ function render() {
         : projectView(store, { ...ctx, id: parts[1], tab: parts[2] });
       break;
     case "settings": view = settingsView(store, { version: VERSION, native: isNative() }); nav = "settings"; break;
+    case "export": view = exportView(store, { projectId: parts[1] ?? null, isAndroid: /Android/i.test(navigator.userAgent) }); nav = "projects"; break;
     case "sync": view = syncView(store, { deviceId, isAndroid: /Android/i.test(navigator.userAgent), confirm: confirmDialog, hold }); nav = "settings"; break;
     case "netcheck": view = netcheckView({ isAndroid: /Android/i.test(navigator.userAgent) }); nav = "settings"; break;
     default: view = dashboardView(store, { ...ctx, sync: syncSummary(store, deviceId) });
