@@ -30,9 +30,13 @@ The key was created by the one-time **Generate Android release key** workflow in
 
 ## Windows installer
 
-Windows code-signing certificates trusted by SmartScreen are not free, so the `.msi` is unsigned for now and Windows shows "Windows protected your PC" (More info, then Run anyway). Free options for later:
+Plan (decided Nov 26): Windows ships through the **Microsoft Store as an MSIX package**. Microsoft signs it for free and Windows keeps it updated; the release workflow will publish each tagged version. This comes after a few test iterations.
 
-- **SignPath Foundation:** free code signing for open-source projects (application required).
-- **Microsoft Store:** free individual developer account; Store installs are signed by Microsoft.
+Until then, test builds use the unsigned `.msi` from CI, and Windows shows "Windows protected your PC" (More info, then Run anyway).
 
-The app's update check (spec 6.1) will use a separate, free Tauri update-signing key, which can live in the signing repository too.
+To check before the Store release:
+
+- MSIX packaging step for the Tauri build
+- Local-network permission in the package, needed for QR sync (phase 2)
+- A short privacy policy page (the Store requires one)
+- One manual first submission in Partner Center; CI handles updates after that
