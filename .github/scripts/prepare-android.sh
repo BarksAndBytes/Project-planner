@@ -31,4 +31,6 @@ if ! grep -q 'android.speech.action.RECOGNIZE_SPEECH' "$manifest"; then
   awk -v q="$q" '/<application/ && !done { print q; done=1 } { print }' "$manifest" > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
 fi
 grep -q 'RECOGNIZE_SPEECH' "$manifest" || { echo "::error::could not add speech queries"; exit 1; }
+# 5. App icon (launcher, round and adaptive), replacing the template's defaults.
+cp -R src-tauri/android/res/. "$gen/app/src/main/res/"
 echo "Android project prepared."
